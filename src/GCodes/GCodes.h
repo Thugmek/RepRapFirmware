@@ -270,6 +270,8 @@ private:
 	bool HandleGcode(GCodeBuffer& gb, const StringRef& reply);			// Do a G code
 	bool HandleMcode(GCodeBuffer& gb, const StringRef& reply);			// Do an M code
 	bool HandleTcode(GCodeBuffer& gb, const StringRef& reply);			// Do a T code
+	bool HandlePaletteCode(GCodeBuffer& gb, const StringRef& reply);	// Do a O code
+	bool HandleUnknownCode(GCodeBuffer& gb, const StringRef& reply);    // Do custom code
 	bool HandleResult(GCodeBuffer& gb, GCodeResult rslt, const StringRef& reply, OutputBuffer *outBuf)
 		pre(outBuf == nullptr || rslt == GCodeResult::ok);
 

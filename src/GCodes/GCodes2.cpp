@@ -83,14 +83,59 @@ bool GCodes::ActOnCode(GCodeBuffer& gb, const StringRef& reply)
 	case 'T':
 		return HandleTcode(gb, reply);
 
+	case 'O':
+		return HandlePaletteCode(gb, reply);
+
 	default:
-		break;
+		return HandleUnknownCode(gb, reply);
 	}
 
 	reply.printf("Bad command: %s", gb.Buffer());
 	HandleReply(gb, GCodeResult::error, reply.c_str());
 	return true;
 }
+
+bool GCodes::HandleUnknownCode(GCodeBuffer& gb, const StringRef& reply)
+{
+	GCodeResult result = GCodeResult::ok;
+	OutputBuffer *outBuf = nullptr;
+
+	platform.MessageF(UsbMessage, "%s\n", gb.Buffer()); // Resend to OctoPrint
+
+	return HandleResult(gb, result, reply, outBuf);
+}
+
+bool GCodes::HandlePaletteCode(GCodeBuffer& gb, const StringRef& reply)
+{
+	GCodeResult result = GCodeResult::ok;
+	OutputBuffer *outBuf = nullptr;
+
+	if ((strcmp(gb.Buffer(), "ok") == 0) or (strcmp(gb.Buffer(), "OK") == 0))
+	{
+		for (GCodeBuffer* targetGb : gcodeSources)
+		{
+			if (targetGb != nullptr)
+			{
+				targetGb->MessageAcknowledged(false);
+			}
+		}
+	} else
+	{
+		if (!LockMovementAndWaitForStandstill(gb))
+		{
+			return false;					// if it's a blocking message, wait for movement to stop before displaying it
+		}
+
+		platform.MessageF(UsbMessage, "%s\n", gb.Buffer()); // Resend to OctoPrint
+
+		Push(gb); // stack the machine state including the file position
+		gb.MachineState().fileState.Close();							// stop reading from file
+		gb.MachineState().waitingForAcknowledgement = true;				// flag that we are waiting for acknowledgement
+	}
+
+	return HandleResult(gb, result, reply, outBuf);
+}
+
 
 bool GCodes::HandleGcode(GCodeBuffer& gb, const StringRef& reply)
 {
