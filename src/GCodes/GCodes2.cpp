@@ -1619,6 +1619,10 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				if (gb.Seen(('S')))
 				{
 					gb.GetQuotedString(message.GetRef());
+
+					if (type == DirectLcdMessage) {
+						message.cat("\n");
+					}
 					platform.Message(type, message.c_str());
 				}
 			}
@@ -2800,134 +2804,169 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 
 	case 550: // Set/report machine name
 		{
-			String<MachineNameLength> name;
-			bool seen = false;
-			gb.TryGetPossiblyQuotedString('P', name.GetRef(), seen);
-			if (seen)
+			if (&gb == auxGCode) // Mobile application forward
 			{
-				reprap.SetName(name.c_str());
+				platform.MessageF(UsbMessage, "%s\n", gb.Buffer()); // Resend to OctoPrint
 			}
 			else
 			{
-				reply.printf("RepRap name: %s", reprap.GetName());
+				String<MachineNameLength> name;
+				bool seen = false;
+				gb.TryGetPossiblyQuotedString('P', name.GetRef(), seen);
+				if (seen)
+				{
+					reprap.SetName(name.c_str());
+				}
+				else
+				{
+					reply.printf("RepRap name: %s", reprap.GetName());
+				}
 			}
 		}
 		break;
 
 	case 551: // Set password (no option to report it)
 		{
-			String<RepRapPasswordLength> password;
-			bool seen = false;
-			gb.TryGetPossiblyQuotedString('P', password.GetRef(), seen);
-			if (seen)
+			if (&gb == auxGCode) // Mobile application forward
 			{
-				reprap.SetPassword(password.c_str());
+				platform.MessageF(UsbMessage, "%s\n", gb.Buffer()); // Resend to OctoPrint
+			}
+			else
+			{
+				String<RepRapPasswordLength> password;
+				bool seen = false;
+				gb.TryGetPossiblyQuotedString('P', password.GetRef(), seen);
+				if (seen)
+				{
+					reprap.SetPassword(password.c_str());
+				}
 			}
 		}
 		break;
 
 	case 552: // Enable/Disable network and/or Set/Get IP address
-		if (!gb.MachineState().runningM502)			// when running M502 we don't execute network-related commands
+		if (&gb == auxGCode) // Mobile application forward
 		{
-			bool seen = false;
-			const unsigned int interface = (gb.Seen('I') ? gb.GetUIValue() : 0);
-
-			String<SsidBufferLength> ssid;
-			if (reprap.GetNetwork().IsWiFiInterface(interface))
+			platform.MessageF(UsbMessage, "%s\n", gb.Buffer()); // Resend to OctoPrint
+		}
+		else
+		{
+			if (!gb.MachineState().runningM502)			// when running M502 we don't execute network-related commands
 			{
-				if (gb.Seen('S')) // Has the user turned the network on or off?
-				{
-					const int enableValue = gb.GetIValue();
-					seen = true;
+				bool seen = false;
+				const unsigned int interface = (gb.Seen('I') ? gb.GetUIValue() : 0);
 
-					if (gb.Seen('P') && !gb.GetQuotedString(ssid.GetRef()))
+				String<SsidBufferLength> ssid;
+				if (reprap.GetNetwork().IsWiFiInterface(interface))
+				{
+					if (gb.Seen('S')) // Has the user turned the network on or off?
 					{
-						reply.copy("Bad or missing SSID");
-						result = GCodeResult::error;
-					}
-					else
-					{
-						result = reprap.GetNetwork().EnableInterface(interface, enableValue, ssid.GetRef(), reply);
+						const int enableValue = gb.GetIValue();
+						seen = true;
+
+						if (gb.Seen('P') && !gb.GetQuotedString(ssid.GetRef()))
+						{
+							reply.copy("Bad or missing SSID");
+							result = GCodeResult::error;
+						}
+						else
+						{
+							result = reprap.GetNetwork().EnableInterface(interface, enableValue, ssid.GetRef(), reply);
+						}
 					}
 				}
-			}
-			else
-			{
-				if (gb.Seen('P'))
+				else
 				{
-					seen = true;
-					IPAddress eth;
-					if (gb.GetIPAddress(eth))
+					if (gb.Seen('P'))
 					{
-						platform.SetIPAddress(eth);
+						seen = true;
+						IPAddress eth;
+						if (gb.GetIPAddress(eth))
+						{
+							platform.SetIPAddress(eth);
+						}
+						else
+						{
+							reply.copy("Bad IP address");
+							result = GCodeResult::error;
+							break;
+						}
 					}
-					else
+
+					// Process this one last in case the IP address is changed and the network enabled in the same command
+					if (gb.Seen('S')) // Has the user turned the network on or off?
 					{
-						reply.copy("Bad IP address");
-						result = GCodeResult::error;
-						break;
+						seen = true;
+						result = reprap.GetNetwork().EnableInterface(interface, gb.GetIValue(), ssid.GetRef(), reply);
 					}
 				}
 
-				// Process this one last in case the IP address is changed and the network enabled in the same command
-				if (gb.Seen('S')) // Has the user turned the network on or off?
+				if (!seen)
 				{
-					seen = true;
-					result = reprap.GetNetwork().EnableInterface(interface, gb.GetIValue(), ssid.GetRef(), reply);
+					result = reprap.GetNetwork().GetNetworkState(interface, reply);
 				}
-			}
-
-			if (!seen)
-			{
-				result = reprap.GetNetwork().GetNetworkState(interface, reply);
 			}
 		}
 		break;
 
 	case 553: // Set/Get netmask
-		if (!gb.MachineState().runningM502)			// when running M502 we don't execute network-related commands
+		if (&gb == auxGCode) // Mobile application forward
 		{
-			if (gb.Seen('P'))
+			platform.MessageF(UsbMessage, "%s\n", gb.Buffer()); // Resend to OctoPrint
+		}
+		else
+		{
+			if (!gb.MachineState().runningM502)			// when running M502 we don't execute network-related commands
 			{
-				IPAddress eth;
-				if (gb.GetIPAddress(eth))
+				if (gb.Seen('P'))
 				{
-					platform.SetNetMask(eth);
+					IPAddress eth;
+					if (gb.GetIPAddress(eth))
+					{
+						platform.SetNetMask(eth);
+					}
+					else
+					{
+						reply.copy("Bad IP address");
+						result = GCodeResult::error;
+					}
 				}
 				else
 				{
-					reply.copy("Bad IP address");
-					result = GCodeResult::error;
+					const IPAddress nm = platform.NetMask();
+					reply.printf("Net mask: %d.%d.%d.%d ", nm.GetQuad(0), nm.GetQuad(1), nm.GetQuad(2), nm.GetQuad(3));
 				}
-			}
-			else
-			{
-				const IPAddress nm = platform.NetMask();
-				reply.printf("Net mask: %d.%d.%d.%d ", nm.GetQuad(0), nm.GetQuad(1), nm.GetQuad(2), nm.GetQuad(3));
 			}
 		}
 		break;
 
 	case 554: // Set/Get gateway
-		if (!gb.MachineState().runningM502)			// when running M502 we don't execute network-related commands
+		if (&gb == auxGCode) // Mobile application forward
 		{
-			if (gb.Seen('P'))
+			platform.MessageF(UsbMessage, "%s\n", gb.Buffer()); // Resend to OctoPrint
+		}
+		else
+		{
+			if (!gb.MachineState().runningM502)			// when running M502 we don't execute network-related commands
 			{
-				IPAddress eth;
-				if (gb.GetIPAddress(eth))
+				if (gb.Seen('P'))
 				{
-					platform.SetGateWay(eth);
+					IPAddress eth;
+					if (gb.GetIPAddress(eth))
+					{
+						platform.SetGateWay(eth);
+					}
+					else
+					{
+						reply.copy("Bad IP address");
+						result = GCodeResult::error;
+					}
 				}
 				else
 				{
-					reply.copy("Bad IP address");
-					result = GCodeResult::error;
+					const IPAddress gw = platform.GateWay();
+					reply.printf("Gateway: %d.%d.%d.%d ", gw.GetQuad(0), gw.GetQuad(1), gw.GetQuad(2), gw.GetQuad(3));
 				}
-			}
-			else
-			{
-				const IPAddress gw = platform.GateWay();
-				reply.printf("Gateway: %d.%d.%d.%d ", gw.GetQuad(0), gw.GetQuad(1), gw.GetQuad(2), gw.GetQuad(3));
 			}
 		}
 		break;
@@ -3532,16 +3571,23 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		}
 		break;
 
-#if HAS_WIFI_NETWORKING
 	case 587:	// Add WiFi network or list remembered networks
 	case 588:	// Forget WiFi network
 	case 589:	// Configure access point
-		if (!gb.MachineState().runningM502)			// when running M502 we don't execute network-related commands
+		if (&gb == auxGCode) // Mobile application forward
 		{
-			result = reprap.GetNetwork().HandleWiFiCode(code, gb, reply, outBuf);
+			platform.MessageF(UsbMessage, "%s\n", gb.Buffer()); // Resend to OctoPrint
 		}
-		break;
+#if HAS_WIFI_NETWORKING
+		else
+		{
+			if (!gb.MachineState().runningM502)			// when running M502 we don't execute network-related commands
+			{
+				result = reprap.GetNetwork().HandleWiFiCode(code, gb, reply, outBuf);
+			}
+		}
 #endif
+		break;
 
 	case 591: // Configure filament sensor
 		if (gb.Seen('D'))
