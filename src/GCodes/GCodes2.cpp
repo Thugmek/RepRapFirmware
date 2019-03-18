@@ -1606,6 +1606,9 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				case 4:		// Telnet
 					type = TelnetMessage;
 					break;
+				case 99:    // BT Message
+					type = LcdMessage;
+					break;
 				default:
 					reply.printf("Invalid message type: %d", type);
 					result = GCodeResult::error;
@@ -1620,9 +1623,6 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				{
 					gb.GetQuotedString(message.GetRef());
 
-					if (type == DirectLcdMessage) {
-						message.cat("\n");
-					}
 					platform.Message(type, message.c_str());
 				}
 			}
