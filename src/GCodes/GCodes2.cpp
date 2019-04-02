@@ -2903,7 +2903,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 
 				if (!seen)
 				{
-					result = reprap.GetNetwork().GetNetworkState(interface, reply);
+				//	result = reprap.GetNetwork().GetNetworkState(interface, reply);
 				}
 			}
 		}
