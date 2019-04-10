@@ -38,6 +38,9 @@ public:
 	void Reset() override;
 	size_t BytesCached() const override;				// How many bytes have been cached?
 
+	size_t ReadBytesUntil(char terminator, char *buffer, size_t length); // as readBytes with terminator character
+	size_t ReadLine(char *buffer, size_t length);
+
 protected:
 	char ReadByte() override;
 

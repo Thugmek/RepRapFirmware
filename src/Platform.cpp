@@ -1145,18 +1145,27 @@ void Platform::Beep(int freq, int ms)
 }
 
 // Send a short message to the aux channel. There is no flow control on this port, so it can't block for long.
-void Platform::SendAuxMessage(const char* msg)
+void Platform::SendAuxMessage(const char* msg, bool rawMessage)
 {
 #ifdef SERIAL_AUX_DEVICE
 	OutputBuffer *buf;
+
 	if (OutputBuffer::Allocate(buf))
 	{
-		buf->copy("{\"message\":");
-		buf->EncodeString(msg, false);
-		buf->cat("}\n");
-		auxOutput.Push(buf);
-		FlushAuxMessages();
+		if (rawMessage)
+		{
+			buf->copy(msg);
+		}
+		else
+		{
+			buf->copy("{\"message\":");
+			buf->EncodeString(msg, false);
+			buf->cat("}\n");
+		}
 	}
+
+	auxOutput.Push(buf);
+	FlushAuxMessages();
 #endif
 }
 

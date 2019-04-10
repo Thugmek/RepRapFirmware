@@ -53,6 +53,23 @@ char StreamGCodeInput::ReadByte()
 	return static_cast<char>(device.read());
 }
 
+size_t StreamGCodeInput::ReadBytesUntil(char terminator, char *buffer, size_t length) // as readBytes with terminator character
+{
+	return device.readBytesUntil(terminator, buffer, length);
+}
+
+size_t StreamGCodeInput::ReadLine(char *buffer, size_t length)
+{
+	size_t num_read = device.readBytesUntil('\n', buffer, length);
+	buffer[num_read] = '\0';
+
+	if (num_read > 0)
+		if (buffer[num_read - 1] == '\r')
+			buffer[num_read - 1] = '\0';
+
+	return num_read;
+}
+
 size_t StreamGCodeInput::BytesCached() const
 {
 	return device.available();

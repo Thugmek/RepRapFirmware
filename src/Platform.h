@@ -520,7 +520,7 @@ public:
 
 	// AUX device
 	void Beep(int freq, int ms);
-	void SendAuxMessage(const char* msg);
+	void SendAuxMessage(const char* msg, bool rawMessage = false);
 
 	// Hotend configuration
 	float GetFilamentWidth() const;

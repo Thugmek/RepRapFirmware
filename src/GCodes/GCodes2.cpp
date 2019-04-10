@@ -2845,67 +2845,64 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		break;
 
 	case 552: // Enable/Disable network and/or Set/Get IP address
-		if (&gb == auxGCode) // Mobile application forward
+		if (!gb.MachineState().runningM502)			// when running M502 we don't execute network-related commands
 		{
-			platform.MessageF(UsbMessage, "%s\n", gb.Buffer()); // Resend to OctoPrint
-		}
-		else
-		{
-			if (!gb.MachineState().runningM502)			// when running M502 we don't execute network-related commands
+			bool seen = false;
+			const unsigned int interface = (gb.Seen('I') ? gb.GetUIValue() : 0);
+
+			String<SsidBufferLength> ssid;
+			if (reprap.GetNetwork().IsWiFiInterface(interface))
 			{
-				bool seen = false;
-				const unsigned int interface = (gb.Seen('I') ? gb.GetUIValue() : 0);
-
-				String<SsidBufferLength> ssid;
-				if (reprap.GetNetwork().IsWiFiInterface(interface))
+				if (gb.Seen('S')) // Has the user turned the network on or off?
 				{
-					if (gb.Seen('S')) // Has the user turned the network on or off?
-					{
-						const int enableValue = gb.GetIValue();
-						seen = true;
+					const int enableValue = gb.GetIValue();
+					seen = true;
 
-						if (gb.Seen('P') && !gb.GetQuotedString(ssid.GetRef()))
-						{
-							reply.copy("Bad or missing SSID");
-							result = GCodeResult::error;
-						}
-						else
-						{
-							result = reprap.GetNetwork().EnableInterface(interface, enableValue, ssid.GetRef(), reply);
-						}
-					}
-				}
-				else
-				{
-					if (gb.Seen('P'))
+					if (gb.Seen('P') && !gb.GetQuotedString(ssid.GetRef()))
 					{
-						seen = true;
-						IPAddress eth;
-						if (gb.GetIPAddress(eth))
-						{
-							platform.SetIPAddress(eth);
-						}
-						else
-						{
-							reply.copy("Bad IP address");
-							result = GCodeResult::error;
-							break;
-						}
+						reply.copy("Bad or missing SSID");
+						result = GCodeResult::error;
 					}
-
-					// Process this one last in case the IP address is changed and the network enabled in the same command
-					if (gb.Seen('S')) // Has the user turned the network on or off?
+					else
 					{
-						seen = true;
-						result = reprap.GetNetwork().EnableInterface(interface, gb.GetIValue(), ssid.GetRef(), reply);
+						result = reprap.GetNetwork().EnableInterface(interface, enableValue, ssid.GetRef(), reply);
 					}
-				}
-
-				if (!seen)
-				{
-				//	result = reprap.GetNetwork().GetNetworkState(interface, reply);
 				}
 			}
+			else
+			{
+				if (gb.Seen('P'))
+				{
+					seen = true;
+					IPAddress eth;
+					if (gb.GetIPAddress(eth))
+					{
+						platform.SetIPAddress(eth);
+					}
+					else
+					{
+						reply.copy("Bad IP address");
+						result = GCodeResult::error;
+						break;
+					}
+				}
+
+				// Process this one last in case the IP address is changed and the network enabled in the same command
+				if (gb.Seen('S')) // Has the user turned the network on or off?
+				{
+					seen = true;
+					result = reprap.GetNetwork().EnableInterface(interface, gb.GetIValue(), ssid.GetRef(), reply);
+				}
+			}
+
+			if (!seen)
+			{
+				//	result = reprap.GetNetwork().GetNetworkState(interface, reply);
+				result = GCodeResult::ok;
+			}
+
+			// Mobile application forward
+			platform.MessageF(UsbMessage, "%s\n", gb.Buffer()); // Resend to OctoPrint
 		}
 		break;
 
@@ -4015,6 +4012,87 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		result = GCodeResult::error;
 		break;
 #endif
+
+	case 780: // Set BT module parameters
+		{
+			result = GCodeResult::error;
+
+			if (gb.Seen('P'))
+			{
+				String<MachineNameLength> name;
+				gb.GetPossiblyQuotedString(name.GetRef());
+
+				uint32_t bt_baudrates[9] = { 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400 };
+				uint32_t mem_baudrate = platform.GetBaudRate(1); // backup baudrate setting
+
+				bool detected = false;
+				char rsp[40];
+
+				for( int i = 0; i < 9; i++) { // loop for baudrate
+					platform.SetBaudRate(1, bt_baudrates[i]); // initial baudrate
+
+					auxInput->Reset(); // reset serial input buffer
+
+					platform.SendAuxMessage("AT\r\n", true); // test baudrate
+
+					auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+					if (strcmp(rsp, "OK") == 0)
+					{
+						detected = true;
+						break;
+					}
+				}
+
+				if (detected)
+				{
+					int baudrate_nr = 8;
+					if (gb.Seen('B'))
+					{
+						uint32_t baudrate = gb.GetIValue();
+						for(int i = 0; i < 9; i++)
+							if (bt_baudrates[i] == baudrate)
+								baudrate_nr = i + 1;
+					}
+					char cmd[50];
+					sprintf(cmd, "AT+BAUD%u\r\n", baudrate_nr);
+					platform.SendAuxMessage(cmd, true); // set device name
+
+					auxInput->ReadLine(rsp, sizeof(rsp) - 1); // trash responsed name
+					auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+					if (strcmp(rsp, "OK") == 0)
+					{
+						char cmd[50];
+						sprintf(cmd, "AT+NAME%s\r\n", name.c_str());
+						platform.SendAuxMessage(cmd, true); // set device name
+
+						auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+						auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+						if (strcmp(rsp, "OK") == 0)
+						{
+							platform.SendAuxMessage("AT+RESET\r\n", true);
+
+							auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+							auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+							if (strcmp(rsp, "OK") == 0)
+								result = GCodeResult::ok;
+							else
+								reply.copy("Reset fault");
+						}
+						else
+							reply.copy("Setup name fault");
+					}
+					else
+						reply.copy("Setup baudrate fault");
+				}
+				else
+					reply.copy("BT module not detected");
+
+				platform.SetBaudRate(1, mem_baudrate); // restore original baudrate
+			}
+			else
+				reply.copy("Missing name parameter");
+		}
+		break;
 
 	case 851: // Set Z probe offset, only for Marlin compatibility
 		{
