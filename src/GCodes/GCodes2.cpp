@@ -405,7 +405,17 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 	case 0: // Stop
 	case 1: // Sleep
 		// Don't allow M0 or M1 to stop a print, unless the print is paused or the command comes from the file being printed itself.
-		if (reprap.GetPrintMonitor().IsPrinting() && &gb != fileGCode && !IsPaused())
+		if (reprap.GetPrintMonitor().IsPrinting() && &gb == fileGCode && !IsPaused())
+		{
+			if (strcmp(".mcf", reprap.GetPrintMonitor().GetPrintingFilename()) != 0)
+			{
+				platform.MessageF(UsbMessage, "%s\n", gb.Buffer()); // Resend to OctoPrint
+
+				DoPause(gb, PauseReason::user, nullptr);
+				result = GCodeResult::ok;
+			}
+		}
+		else if (reprap.GetPrintMonitor().IsPrinting() && &gb != fileGCode && !IsPaused())
 		{
 			reply.copy("Pause the print before attempting to cancel it");
 			result = GCodeResult::error;
