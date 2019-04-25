@@ -4094,6 +4094,28 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		}
 		break;
 
+	case 781: // Get BT module mac address
+		{
+			result = GCodeResult::error;
+
+			char rsp[40];
+
+			auxInput->Reset(); // reset serial input buffer
+			platform.SendAuxMessage("AT\r\n", true); // test baudrate
+			auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+			if (strcmp(rsp, "OK") == 0)
+			{
+				platform.SendAuxMessage("AT+ADDR\r\n", true);
+				auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+
+				reply.copy(rsp+6); // from response +ADDR=00:15:87:20:FF:46 copy only MAC
+				result = GCodeResult::ok;
+			}
+			else
+				reply.copy("BT module not detected");
+		}
+		break;
+
 	case 851: // Set Z probe offset, only for Marlin compatibility
 		{
 			ZProbe params = platform.GetCurrentZProbeParameters();
