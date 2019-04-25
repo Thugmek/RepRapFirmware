@@ -4099,6 +4099,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			result = GCodeResult::error;
 
 			char rsp[40];
+			char rsp2[40];
 
 			auxInput->Reset(); // reset serial input buffer
 			platform.SendAuxMessage("AT\r\n", true); // test baudrate
@@ -4108,7 +4109,10 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				platform.SendAuxMessage("AT+ADDR\r\n", true);
 				auxInput->ReadLine(rsp, sizeof(rsp) - 1);
 
-				reply.copy(rsp+6); // from response +ADDR=00:15:87:20:FF:46 copy only MAC
+				strcpy(rsp2, "Bluetooth MAC: ");
+				strcat(rsp2, rsp+6); // from response +ADDR=00:15:87:20:FF:46 copy only MAC
+
+				reply.copy(rsp2);
 				result = GCodeResult::ok;
 			}
 			else
