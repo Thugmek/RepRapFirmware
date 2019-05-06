@@ -1885,34 +1885,36 @@ OutputBuffer *RepRap::GetFilesResponse(const char *dir, unsigned int startAt, bo
 	unsigned int err;
 	unsigned int nextFile = 0;
 
-	if (!platform->GetMassStorage()->CheckDriveMounted(dir))
-	{
-		err = 1;
-	}
-	else if (!platform->GetMassStorage()->DirectoryExists(dir))
-	{
-		err = 2;
-	}
-	else
+	if (strncmp(dir, "2:/", 3) == 0)
 	{
 		err = 0;
 		FileInfo fileInfo;
 		unsigned int filesFound = 0;
-		bool gotFile = platform->GetMassStorage()->FindFirst(dir, fileInfo);
+		char rsp[100];
 
-		size_t bytesLeft = OutputBuffer::GetBytesLeft(response);	// don't write more bytes than we can
+		size_t bytesLeft = OutputBuffer::GetBytesLeft(response);
 
-		while (gotFile)
+		StreamGCodeInput* serialInput = gCodes->serialInput;
+		serialInput->Reset(); // reset serial input buffer
+		platform->MessageF(UsbMessage, "M20 P\"%s\"\n", dir);
+
+		while (true)
 		{
-			if (fileInfo.fileName[0] != '.')						// ignore Mac resource files and Linux hidden files
+			serialInput->ReadLine(rsp, sizeof(rsp) - 1);
+			if (strcmp(rsp, "End file list") == 0)
+			{
+				platform->MessageF(UsbMessage, "ok\n");
+				break;
+			}
+			else
 			{
 				if (filesFound >= startAt)
 				{
-					// Make sure we can end this response properly
+					fileInfo.fileName.copy(rsp+2); //F:file name, D:directory name
+					fileInfo.isDirectory = (rsp[0] == 'D'); // Directory
+
 					if (bytesLeft < fileInfo.fileName.strlen() * 2 + 20)
 					{
-						// No more space available - stop here
-						platform->GetMassStorage()->AbandonFindNext();
 						nextFile = filesFound;
 						break;
 					}
@@ -1927,7 +1929,54 @@ OutputBuffer *RepRap::GetFilesResponse(const char *dir, unsigned int startAt, bo
 				}
 				++filesFound;
 			}
-			gotFile = platform->GetMassStorage()->FindNext(fileInfo);
+		}
+	}
+	else
+	{
+		if (!platform->GetMassStorage()->CheckDriveMounted(dir))
+		{
+			err = 1;
+		}
+		else if (!platform->GetMassStorage()->DirectoryExists(dir))
+		{
+			err = 2;
+		}
+		else
+		{
+			err = 0;
+			FileInfo fileInfo;
+			unsigned int filesFound = 0;
+			bool gotFile = platform->GetMassStorage()->FindFirst(dir, fileInfo);
+
+			size_t bytesLeft = OutputBuffer::GetBytesLeft(response);	// don't write more bytes than we can
+
+			while (gotFile)
+			{
+				if (fileInfo.fileName[0] != '.')						// ignore Mac resource files and Linux hidden files
+				{
+					if (filesFound >= startAt)
+					{
+						// Make sure we can end this response properly
+						if (bytesLeft < fileInfo.fileName.strlen() * 2 + 20)
+						{
+							// No more space available - stop here
+							platform->GetMassStorage()->AbandonFindNext();
+							nextFile = filesFound;
+							break;
+						}
+
+						// Write separator and filename
+						if (filesFound != startAt)
+						{
+							bytesLeft -= response->cat(',');
+						}
+
+						bytesLeft -= response->EncodeString(fileInfo.fileName, false, flagsDirs && fileInfo.isDirectory);
+					}
+					++filesFound;
+				}
+				gotFile = platform->GetMassStorage()->FindNext(fileInfo);
+			}
 		}
 	}
 
@@ -2039,10 +2088,38 @@ bool RepRap::GetFileInfoResponse(const char *filename, OutputBuffer *&response, 
 	if (filename != nullptr && filename[0] != 0)
 	{
 		GCodeFileInfo info;
-		if (!platform->GetMassStorage()->GetFileInfo(platform->GetGCodeDir(), filename, info, quitEarly))
+		if (strncmp(filename, "2:/", 3) == 0)
 		{
-			// This may take a few runs...
-			return false;
+			char rsp[100];
+
+			StreamGCodeInput* serialInput = gCodes->serialInput;
+			serialInput->Reset(); // reset serial input buffer
+			platform->MessageF(UsbMessage, "M36 \"%s\"\n", filename);
+
+			info.Init();
+
+			serialInput->ReadLine(rsp, sizeof(rsp) - 1);
+
+			char * pch = strstr(rsp,"\"err\":");
+			info.isValid = (SafeStrtoul(pch + 6) == 0); // "err":0
+			if (info.isValid)
+			{
+				pch = strstr(rsp,"\"size\":");
+				info.fileSize = SafeStrtoul(pch + 7); // "size":123456
+
+				pch = strstr(rsp,"\"lastModified\":");
+				struct tm tm;
+				strptime(pch + 15, "%Y-%m-%d %H:%M:%S", &tm); // 2019-01-24T14:25:02
+				info.lastModifiedTime = mktime(&tm);
+			}
+		}
+		else
+		{
+			if (!platform->GetMassStorage()->GetFileInfo(platform->GetGCodeDir(), filename, info, quitEarly))
+			{
+				// This may take a few runs...
+				return false;
+			}
 		}
 
 		if (info.isValid)

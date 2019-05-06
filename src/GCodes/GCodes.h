@@ -414,7 +414,9 @@ private:
 	Platform& platform;													// The RepRap machine
 
 	FileGCodeInput* fileInput;											// ...
+public:
 	StreamGCodeInput* serialInput;										// ...
+private:
 
 #if HAS_NETWORKING
 	NetworkGCodeInput* httpInput;										// These cache incoming G-codes...
