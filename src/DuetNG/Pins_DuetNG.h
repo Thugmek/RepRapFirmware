@@ -1,6 +1,8 @@
 #ifndef PINS_DUETNG_H__
 #define PINS_DUETNG_H__
 
+#include "Trilab.h"
+
 # define FIRMWARE_NAME	"RepRapFirmware for Duet 2 WiFi/Ethernet"
 # define DEFAULT_BOARD_TYPE BoardType::DuetWiFi_10
 constexpr size_t NumFirmwareUpdateModules = 4;		// 3 modules, plus one for manual upload to WiFi module (module 2 is now unused)
@@ -147,9 +149,15 @@ constexpr size_t NumTachos = 1;
 constexpr Pin TachoPins[NumTachos] = { 102 };								// PB6 on expansion connector
 
 // SD cards
+#if SUPPORT_RPI_USB_DRIVE
+constexpr size_t NumSdCards = 3;
+constexpr Pin SdCardDetectPins[NumSdCards] = {53, NoPin, NoPin};
+constexpr Pin SdWriteProtectPins[NumSdCards] = {NoPin, NoPin, NoPin};
+#else
 constexpr size_t NumSdCards = 2;
 constexpr Pin SdCardDetectPins[NumSdCards] = {53, NoPin};
 constexpr Pin SdWriteProtectPins[NumSdCards] = {NoPin, NoPin};
+#endif
 constexpr Pin SdSpiCSPins[1] = {56};
 constexpr uint32_t ExpectedSdCardSpeed = 20000000;
 

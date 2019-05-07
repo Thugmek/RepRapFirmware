@@ -3,6 +3,11 @@
 #include "RepRap.h"
 #include "sd_mmc.h"
 
+#if SUPPORT_RPI_USB_DRIVE
+#include "GCodes/GCodes.h"
+#include "GCodes/GCodeInput.h"
+#endif
+
 // Check that the LFN configuration in FatFS is sufficient
 static_assert(FF_MAX_LFN >= MaxFilenameLength, "FF_MAX_LFN too small");
 
@@ -65,7 +70,7 @@ MassStorage::MassStorage(Platform* p) : freeWriteBuffers(nullptr)
 
 void MassStorage::Init()
 {
-	static const char * const VolMutexNames[] = { "SD0", "SD1" };
+	static const char * const VolMutexNames[] = { "SD0", "SD1", "USB" };
 	static_assert(ARRAY_SIZE(VolMutexNames) >= NumSdCards, "Incorrect VolMutexNames array");
 
 	// Create the mutexes
@@ -192,6 +197,31 @@ void MassStorage::CloseAllFiles()
 // by calling FindNext until it returns false, or by calling AbandonFindNext.
 bool MassStorage::FindFirst(const char *directory, FileInfo &file_info)
 {
+#if SUPPORT_RPI_USB_DRIVE
+	if (strncmp(directory, "2:", 2) == 0)
+	{
+		findUsb = true;
+
+		char rsp[MaxFilenameLength];
+
+		StreamGCodeInput* serialInput = reprap.GetGCodes().serialInput;
+		serialInput->Reset(); // reset serial input buffer
+		reprap.GetPlatform().MessageF(UsbMessage, "M20 P\"%s\"\n", directory);
+
+		serialInput->ReadLine(rsp, sizeof(rsp) - 1);
+		if (strcmp(rsp, "End file list") != 0)
+		{
+			file_info.isDirectory = (rsp[0] == 'D'); // Directory
+			file_info.fileName.copy(rsp + 2); //F:file name, D:directory name
+
+			return true;
+		}
+		return false;
+	}
+	else
+		findUsb = false;
+#endif
+
 	// Remove any trailing '/' from the directory name, it sometimes (but not always) confuses f_opendir
 	String<MaxFilenameLength> loc;
 	loc.copy(directory);
@@ -235,6 +265,27 @@ bool MassStorage::FindFirst(const char *directory, FileInfo &file_info)
 // If it returns false then it also releases the mutex.
 bool MassStorage::FindNext(FileInfo &file_info)
 {
+#if SUPPORT_RPI_USB_DRIVE
+	if (findUsb)
+	{
+		char rsp[MaxFilenameLength];
+
+		reprap.GetGCodes().serialInput->ReadLine(rsp, sizeof(rsp) - 1);
+		if (strcmp(rsp, "End file list") != 0)
+		{
+			file_info.isDirectory = (rsp[0] == 'D'); // Directory
+			file_info.fileName.copy(rsp + 2); //F:file name, D:directory name
+
+			return true;
+		}
+		else
+		{
+			findUsb = false;
+			return false;
+		}
+	}
+#endif
+
 	if (dirMutex.GetHolder() != RTOSIface::GetCurrentTask())
 	{
 		return false;		// error, we don't hold the mutex
@@ -259,6 +310,16 @@ bool MassStorage::FindNext(FileInfo &file_info)
 // Quit searching for files. Needed to avoid hanging on to the mutex. Safe to call even if the caller doesn't hold the mutex.
 void MassStorage::AbandonFindNext()
 {
+#if SUPPORT_RPI_USB_DRIVE
+	if (findUsb)
+	{
+		findUsb = false;
+		reprap.GetGCodes().serialInput->Reset();
+
+		return;
+	}
+#endif
+
 	if (dirMutex.GetHolder() == RTOSIface::GetCurrentTask())
 	{
 		dirMutex.Release();
@@ -393,6 +454,12 @@ bool MassStorage::DirectoryExists(const StringRef& path) const
 		path.Truncate(len - 1);
 	}
 
+#if SUPPORT_RPI_USB_DRIVE
+	if (strncmp(path.c_str(), "2:", 2) == 0) {
+		return true;
+	}
+#endif
+
 	DIR dir;
 	const bool ok = (f_opendir(&dir, path.c_str()) == FR_OK);
 	if (ok)
@@ -459,6 +526,15 @@ GCodeResult MassStorage::Mount(size_t card, const StringRef& reply, bool reportS
 	}
 
 	SdCardInfo& inf = info[card];
+
+#if SUPPORT_RPI_USB_DRIVE
+	if (card == 2) {
+		inf.isMounted = true;
+
+		return GCodeResult::ok;
+	}
+#endif
+
 	MutexLocker lock1(fsMutex);
 	MutexLocker lock2(inf.volMutex);
 	if (!inf.mounting)
@@ -616,6 +692,15 @@ bool MassStorage::IsCardDetected(size_t card) const
 unsigned int MassStorage::InternalUnmount(size_t card, bool doClose)
 {
 	SdCardInfo& inf = info[card];
+
+#if SUPPORT_RPI_USB_DRIVE
+	if (card == 2) {
+		inf.isMounted = false;
+
+		return 0;
+	}
+#endif
+
 	MutexLocker lock1(fsMutex);
 	MutexLocker lock2(inf.volMutex);
 	const unsigned int invalidated = InvalidateFiles(&inf.fileSystem, doClose);
@@ -712,6 +797,37 @@ void MassStorage::Spin()
 			}
 		}
 	}
+}
+
+bool MassStorage::GetFileInfo(const char *directory, const char *fileName, GCodeFileInfo& info, bool quitEarly)
+{
+#if SUPPORT_RPI_USB_DRIVE
+	if (strncmp(fileName, "2:", 2) == 0)
+	{
+		char rsp[MaxFilenameLength];
+
+		StreamGCodeInput* serialInput = reprap.GetGCodes().serialInput;
+		serialInput->Reset(); // reset serial input buffer
+		reprap.GetPlatform().MessageF(UsbMessage, "M36 \"%s\"\n", fileName);
+
+		serialInput->ReadLine(rsp, sizeof(rsp) - 1);
+		char * pch = strstr(rsp,"\"err\":");
+		info.isValid = (SafeStrtoul(pch + 6) == 0); // "err":0
+		if (info.isValid)
+		{
+			pch = strstr(rsp,"\"size\":");
+			info.fileSize = SafeStrtoul(pch + 7); // "size":123456
+
+			pch = strstr(rsp,"\"lastModified\":");
+			struct tm tm;
+			strptime(pch + 15, "%Y-%m-%d %H:%M:%S", &tm); // 2019-01-24T14:25:02
+			info.lastModifiedTime = mktime(&tm);
+		}
+		return true;
+	}
+#endif
+
+	return infoParser.GetFileInfo(directory, fileName, info, quitEarly);
 }
 
 // Append the simulated printing time to the end of the file

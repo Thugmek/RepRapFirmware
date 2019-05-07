@@ -12,6 +12,8 @@
 
 #include <ctime>
 
+#include "Trilab.h"
+
 // Info returned by FindFirst/FindNext calls
 struct FileInfo
 {
@@ -52,7 +54,7 @@ public:
 	unsigned int GetNumFreeFiles() const;
 	void Spin();
 	const Mutex& GetVolumeMutex(size_t vol) const { return info[vol].volMutex; }
-	bool GetFileInfo(const char *directory, const char *fileName, GCodeFileInfo& info, bool quitEarly) { return infoParser.GetFileInfo(directory, fileName, info, quitEarly); }
+	bool GetFileInfo(const char *directory, const char *fileName, GCodeFileInfo& info, bool quitEarly);
 	void RecordSimulationTime(const char *printingFilename, uint32_t simSeconds);	// Append the simulated printing time to the end of the file
 
 	enum class InfoResult : uint8_t
@@ -104,6 +106,9 @@ private:
 
 	FileInfoParser infoParser;
 	DIR findDir;
+
+	bool findUsb;
+
 	FileWriteBuffer *freeWriteBuffers;
 	FileStore files[MAX_FILES];
 };
