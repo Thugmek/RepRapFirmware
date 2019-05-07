@@ -740,7 +740,11 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			String<MaxFilenameLength> filename;
 			if (gb.GetUnprecedentedString(filename.GetRef()))
 			{
-				if (QueueFileToPrint(filename.c_str(), reply))
+				if (strncmp(filename.c_str(), "2:", 2) == 0)
+				{
+					platform.MessageF(UsbMessage, "%s\n", gb.Buffer());
+				}
+				else if (QueueFileToPrint(filename.c_str(), reply))
 				{
 					reprap.GetPrintMonitor().StartingPrint(filename.c_str());
 					if (platform.EmulatingMarlin() && (&gb == serialGCode || &gb == telnetGCode))

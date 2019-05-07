@@ -810,6 +810,8 @@ bool MassStorage::GetFileInfo(const char *directory, const char *fileName, GCode
 		serialInput->Reset(); // reset serial input buffer
 		reprap.GetPlatform().MessageF(UsbMessage, "M36 \"%s\"\n", fileName);
 
+		info.Init();
+
 		serialInput->ReadLine(rsp, sizeof(rsp) - 1);
 		char * pch = strstr(rsp,"\"err\":");
 		info.isValid = (SafeStrtoul(pch + 6) == 0); // "err":0
