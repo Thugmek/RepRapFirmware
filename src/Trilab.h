@@ -2,7 +2,7 @@
  * Trilab.h
  *
  *  Created on: 7. 5. 2019
- *      Author: Matej
+ *      Author: Matej Supik(mat100)
  */
 
 #ifndef SRC_TRILAB_H_

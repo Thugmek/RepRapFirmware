@@ -120,6 +120,7 @@ void MassStorage::ReleaseWriteBuffer(FileWriteBuffer *buffer)
 
 FileStore* MassStorage::OpenFile(const char* directory, const char* fileName, OpenMode mode, uint32_t preAllocSize)
 {
+
 	{
 		MutexLocker lock(fsMutex);
 		for (size_t i = 0; i < MAX_FILES; i++)
@@ -209,14 +210,19 @@ bool MassStorage::FindFirst(const char *directory, FileInfo &file_info)
 		reprap.GetPlatform().MessageF(UsbMessage, "M20 P\"%s\"\n", directory);
 
 		serialInput->ReadLine(rsp, sizeof(rsp) - 1);
-		if (strcmp(rsp, "End file list") != 0)
+		//F:file name, D:directory name, E=End
+		if (rsp[0] == 'E' || not (rsp[0] == 'F' || rsp[0] == 'D'))
 		{
-			file_info.isDirectory = (rsp[0] == 'D'); // Directory
-			file_info.fileName.copy(rsp + 2); //F:file name, D:directory name
+			findUsb = false;
+			return false;
+		}
+		else
+		{
+			file_info.isDirectory = (rsp[0] == 'D');
+			file_info.fileName.copy(rsp + 2);
 
 			return true;
 		}
-		return false;
 	}
 	else
 		findUsb = false;
@@ -271,17 +277,18 @@ bool MassStorage::FindNext(FileInfo &file_info)
 		char rsp[MaxFilenameLength];
 
 		reprap.GetGCodes().serialInput->ReadLine(rsp, sizeof(rsp) - 1);
-		if (strcmp(rsp, "End file list") != 0)
-		{
-			file_info.isDirectory = (rsp[0] == 'D'); // Directory
-			file_info.fileName.copy(rsp + 2); //F:file name, D:directory name
-
-			return true;
-		}
-		else
+		//F:file name, D:directory name, E=End
+		if (rsp[0] == 'E' || not (rsp[0] == 'F' || rsp[0] == 'D'))
 		{
 			findUsb = false;
 			return false;
+		}
+		else
+		{
+			file_info.isDirectory = (rsp[0] == 'D');
+			file_info.fileName.copy(rsp + 2);
+
+			return true;
 		}
 	}
 #endif
@@ -814,16 +821,18 @@ bool MassStorage::GetFileInfo(const char *directory, const char *fileName, GCode
 
 		serialInput->ReadLine(rsp, sizeof(rsp) - 1);
 		char * pch = strstr(rsp,"\"err\":");
-		info.isValid = (SafeStrtoul(pch + 6) == 0); // "err":0
-		if (info.isValid)
-		{
-			pch = strstr(rsp,"\"size\":");
-			info.fileSize = SafeStrtoul(pch + 7); // "size":123456
+		if (pch != NULL) {
+			info.isValid = (SafeStrtoul(pch + 6) == 0); // "err":0
+			if (info.isValid)
+			{
+				pch = strstr(rsp,"\"size\":");
+				info.fileSize = SafeStrtoul(pch + 7); // "size":123456
 
-			pch = strstr(rsp,"\"lastModified\":");
-			struct tm tm;
-			strptime(pch + 15, "%Y-%m-%d %H:%M:%S", &tm); // 2019-01-24T14:25:02
-			info.lastModifiedTime = mktime(&tm);
+				pch = strstr(rsp,"\"lastModified\":");
+				struct tm tm;
+				strptime(pch + 15, "%Y-%m-%d %H:%M:%S", &tm); // 2019-01-24T14:25:02
+				info.lastModifiedTime = mktime(&tm);
+			}
 		}
 		return true;
 	}
