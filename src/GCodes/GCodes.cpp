@@ -5193,6 +5193,42 @@ GCodeResult GCodes::StartSDTiming(GCodeBuffer& gb, const StringRef& reply)
 	return GCodeResult::ok;
 }
 
+GCodeResult GCodes::ForwardToUsb(GCodeBuffer& gb, bool addSource)
+{
+	String<GCodeReplyLength> msg;
+
+	if (addSource)
+	{
+		msg.copy("source:");
+		if (&gb == httpGCode)
+			msg.cat("http");
+		else if (&gb == telnetGCode)
+			msg.cat("telnet");
+		else if (&gb == fileGCode)
+			msg.cat("file");
+		else if (&gb == serialGCode)
+			msg.cat("serial");
+		else if (&gb == auxGCode)
+			msg.cat("aux");
+		else if (&gb == daemonGCode)
+			msg.cat("daemon");
+		else if (&gb == queuedGCode)
+			msg.cat("queued");
+		else if (&gb == lcdGCode)
+			msg.cat("lcd");
+		else if (&gb == autoPauseGCode)
+			msg.cat("autoPause");
+		else
+			msg.cat("unknown");
+		msg.cat(":");
+	}
+	msg.cat(gb.Buffer());
+
+	platform.MessageF(UsbMessage, "%s\n", msg.c_str());
+
+	return GCodeResult::ok;
+}
+
 #if SUPPORT_12864_LCD
 
 // Set the speed factor. Value passed is in percent.

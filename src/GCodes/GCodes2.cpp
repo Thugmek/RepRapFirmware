@@ -100,7 +100,7 @@ bool GCodes::HandleUnknownCode(GCodeBuffer& gb, const StringRef& reply)
 	GCodeResult result = GCodeResult::ok;
 	OutputBuffer *outBuf = nullptr;
 
-	platform.MessageF(UsbMessage, "%s\n", gb.Buffer()); // Resend to OctoPrint
+	ForwardToUsb(gb);
 
 	return HandleResult(gb, result, reply, outBuf);
 }
@@ -126,7 +126,7 @@ bool GCodes::HandlePaletteCode(GCodeBuffer& gb, const StringRef& reply)
 			return false;					// if it's a blocking message, wait for movement to stop before displaying it
 		}
 
-		platform.MessageF(UsbMessage, "%s\n", gb.Buffer()); // Resend to OctoPrint
+		ForwardToUsb(gb, false); // No source info
 
 		Push(gb); // stack the machine state including the file position
 		gb.MachineState().fileState.Close();							// stop reading from file
@@ -409,7 +409,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		{
 			if (strcmp(".mcf", reprap.GetPrintMonitor().GetPrintingFilename()) != 0)
 			{
-				platform.MessageF(UsbMessage, "%s\n", gb.Buffer()); // Resend to OctoPrint
+				ForwardToUsb(gb, false); // no source info
 
 				DoPause(gb, PauseReason::user, nullptr);
 				result = GCodeResult::ok;
@@ -742,7 +742,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			{
 				if (strncmp(filename.c_str(), "2:", 2) == 0)
 				{
-					platform.MessageF(UsbMessage, "%s\n", gb.Buffer());
+					ForwardToUsb(gb);
 				}
 				else if (QueueFileToPrint(filename.c_str(), reply))
 				{
@@ -2820,7 +2820,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		{
 			if (&gb == auxGCode) // Mobile application forward
 			{
-				platform.MessageF(UsbMessage, "%s\n", gb.Buffer()); // Resend to OctoPrint
+				ForwardToUsb(gb);
 			}
 			else
 			{
@@ -2843,7 +2843,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		{
 			if (&gb == auxGCode) // Mobile application forward
 			{
-				platform.MessageF(UsbMessage, "%s\n", gb.Buffer()); // Resend to OctoPrint
+				ForwardToUsb(gb);
 			}
 			else
 			{
@@ -2916,14 +2916,14 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			}
 
 			// Mobile application forward
-			platform.MessageF(UsbMessage, "%s\n", gb.Buffer()); // Resend to OctoPrint
+			ForwardToUsb(gb);
 		}
 		break;
 
 	case 553: // Set/Get netmask
 		if (&gb == auxGCode) // Mobile application forward
 		{
-			platform.MessageF(UsbMessage, "%s\n", gb.Buffer()); // Resend to OctoPrint
+			ForwardToUsb(gb);
 		}
 		else
 		{
@@ -2954,7 +2954,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 	case 554: // Set/Get gateway
 		if (&gb == auxGCode) // Mobile application forward
 		{
-			platform.MessageF(UsbMessage, "%s\n", gb.Buffer()); // Resend to OctoPrint
+			ForwardToUsb(gb);
 		}
 		else
 		{
@@ -3587,7 +3587,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 	case 589:	// Configure access point
 		if (&gb == auxGCode) // Mobile application forward
 		{
-			platform.MessageF(UsbMessage, "%s\n", gb.Buffer()); // Resend to OctoPrint
+			ForwardToUsb(gb);
 		}
 #if HAS_WIFI_NETWORKING
 		else
@@ -4382,7 +4382,8 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		break;
 
 	default:
-		result = GCodeResult::notSupported;
+		// result = GCodeResult::notSupported;
+		ForwardToUsb(gb);
 		break;
 	}
 

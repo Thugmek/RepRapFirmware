@@ -277,6 +277,8 @@ private:
 
 	void HandleReply(GCodeBuffer& gb, OutputBuffer *reply);
 
+	GCodeResult ForwardToUsb(GCodeBuffer& gb, bool addSource=true);
+
 	const char* DoStraightMove(GCodeBuffer& gb, bool isCoordinated) __attribute__((hot));	// Execute a straight move returning any error message
 	const char* DoArcMove(GCodeBuffer& gb, bool clockwise)						// Execute an arc move returning any error message
 		pre(segmentsLeft == 0; resourceOwners[MoveResource] == &gb);
