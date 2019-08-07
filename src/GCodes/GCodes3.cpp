@@ -15,6 +15,7 @@
 #include "Tools/Tool.h"
 #include "PrintMonitor.h"
 #include "Tasks.h"
+#include "Hardware/I2C.h"
 
 #if HAS_WIFI_NETWORKING
 # include "FirmwareUpdater.h"
@@ -153,25 +154,31 @@ GCodeResult GCodes::SetPositions(GCodeBuffer& gb)
 				}
 			}
 			SetBit(axesIncluded, axis);
-			currentUserPosition[axis] = axisValue * distanceScale;
+			currentUserPosition[axis] = gb.ConvertDistance(axisValue);
 		}
 	}
 
 	// Handle any E parameter in the G92 command
 	if (gb.Seen(extrudeLetter))
 	{
-		virtualExtruderPosition = gb.GetFValue() * distanceScale;
+		virtualExtruderPosition = gb.GetDistance();
 	}
 
 	if (axesIncluded != 0)
 	{
 		ToolOffsetTransform(currentUserPosition, moveBuffer.coords);
-		if (reprap.GetMove().GetKinematics().LimitPosition(moveBuffer.coords, numVisibleAxes, LowestNBits<AxesBitmap>(numVisibleAxes), false))	// pretend that all axes are homed
+		if (reprap.GetMove().GetKinematics().LimitPosition(moveBuffer.coords, nullptr, numVisibleAxes, LowestNBits<AxesBitmap>(numVisibleAxes), false, limitAxes)
+			!= LimitPositionResult::ok												// pretend that all axes are homed
+		   )
 		{
 			ToolOffsetInverseTransform(moveBuffer.coords, currentUserPosition);		// make sure the limits are reflected in the user position
 		}
 		reprap.GetMove().SetNewPosition(moveBuffer.coords, true);
 		axesHomed |= reprap.GetMove().GetKinematics().AxesAssumedHomed(axesIncluded);
+		if (IsBitSet(axesIncluded, Z_AXIS))
+		{
+			zDatumSetByProbing -= false;
+		}
 
 #if SUPPORT_ROLAND
 		if (reprap.GetRoland()->Active())
@@ -205,7 +212,7 @@ GCodeResult GCodes::OffsetAxes(GCodeBuffer& gb, const StringRef& reply)
 #else
 			axisOffsets[axis]
 #endif
-						 = -(gb.GetFValue() * distanceScale);
+						 = -gb.GetDistance();
 			seen = true;
 		}
 	}
@@ -217,9 +224,9 @@ GCodeResult GCodes::OffsetAxes(GCodeBuffer& gb, const StringRef& reply)
 		{
 			reply.catf(" %c%.2f", axisLetters[axis],
 #if SUPPORT_WORKPLACE_COORDINATES
-				-(double)(workplaceCoordinates[0][axis]/distanceScale)
+				-(double)(gb.InverseConvertDistance(workplaceCoordinates[0][axis]))
 #else
-				-(double)(axisOffsets[axis]/distanceScale)
+				-(double)(gb.InverseConvertDistance(axisOffsets[axis]))
 #endif
 													 );
 		}
@@ -241,7 +248,7 @@ GCodeResult GCodes::GetSetWorkplaceCoordinates(GCodeBuffer& gb, const StringRef&
 		{
 			if (gb.Seen(axisLetters[axis]))
 			{
-				const float coord = gb.GetFValue() * distanceScale;
+				const float coord = gb.GetDistance();
 				if (!seen)
 				{
 					if (!LockMovementAndWaitForStandstill(gb))						// make sure the user coordinates are stable and up to date
@@ -250,22 +257,16 @@ GCodeResult GCodes::GetSetWorkplaceCoordinates(GCodeBuffer& gb, const StringRef&
 					}
 					seen = true;
 				}
-				workplaceCoordinates[cs - 1][axis] = (compute)
-													? currentUserPosition[axis] - coord + workplaceCoordinates[currentCoordinateSystem][axis]
-														: coord;
+				workplaceCoordinates[cs - 1][axis] = (compute) ? currentUserPosition[axis] - coord : coord;
 			}
 		}
 
-		if (seen)
-		{
-			ToolOffsetInverseTransform(moveBuffer.coords, currentUserPosition);		// update user coordinates in case we are using the workspace we just changed
-		}
-		else
+		if (!seen)
 		{
 			reply.printf("Origin of workplace %" PRIu32 ":", cs);
 			for (size_t axis = 0; axis < numVisibleAxes; axis++)
 			{
-				reply.catf(" %c%.2f", axisLetters[axis], (double)(workplaceCoordinates[cs - 1][axis]/distanceScale));
+				reply.catf(" %c%.2f", axisLetters[axis], (double)gb.InverseConvertDistance(workplaceCoordinates[cs - 1][axis]));
 			}
 		}
 		return GCodeResult::ok;
@@ -274,7 +275,7 @@ GCodeResult GCodes::GetSetWorkplaceCoordinates(GCodeBuffer& gb, const StringRef&
 	return GCodeResult::badOrMissingParameter;
 }
 
-// Save any modified workplace coordinate offsets to file returning true if successful. Used by M500.
+// Save all the workplace coordinate offsets to file returning true if successful. Used by M500 and by SaveResumeInfo.
 bool GCodes::WriteWorkplaceCoordinates(FileStore *f) const
 {
 	for (size_t cs = 0; cs < NumCoordinateSystems; ++cs)
@@ -722,13 +723,6 @@ GCodeResult GCodes::DoDriveMapping(GCodeBuffer& gb, const StringRef& reply)
 			uint32_t drivers[MaxDriversPerAxis];
 			gb.GetUnsignedArray(drivers, numValues, false);
 
-			AxisDriversConfig config;
-			config.numDrivers = numValues;
-			for (size_t i = 0; i < numValues; ++i)
-			{
-				config.driverNumbers[i] = (uint8_t)min<uint32_t>(drivers[i], 255);
-			}
-
 			// Find the drive number allocated to this axis, or allocate a new one if necessary
 			size_t drive = 0;
 			while (drive < numTotalAxes && axisLetters[drive] != c)
@@ -745,7 +739,7 @@ GCodeResult GCodes::DoDriveMapping(GCodeBuffer& gb, const StringRef& reply)
 				moveBuffer.coords[drive] = initialCoords[drive];	// user has defined a new axis, so set its position
 				ToolOffsetInverseTransform(moveBuffer.coords, currentUserPosition);
 			}
-			platform.SetAxisDriversConfig(drive, config);
+			platform.SetAxisDriversConfig(drive, numValues, drivers);
 			if (numTotalAxes + numExtruders > MaxTotalDrivers)
 			{
 				numExtruders = MaxTotalDrivers - numTotalAxes;		// if we added axes, we may have fewer extruders now
@@ -803,12 +797,15 @@ GCodeResult GCodes::DoDriveMapping(GCodeBuffer& gb, const StringRef& reply)
 				c = ':';
 			}
 		}
-		reply.cat(' ');
-		char c = extrudeLetter;
-		for (size_t extruder = 0; extruder < numExtruders; ++extruder)
+		if (numExtruders != 0)
 		{
-			reply.catf("%c%u", c, platform.GetExtruderDriver(extruder));
-			c = ':';
+			reply.cat(' ');
+			char c = extrudeLetter;
+			for (size_t extruder = 0; extruder < numExtruders; ++extruder)
+			{
+				reply.catf("%c%u", c, platform.GetExtruderDriver(extruder));
+				c = ':';
+			}
 		}
 		reply.catf(", %u axes visible", numVisibleAxes);
 	}
@@ -857,6 +854,12 @@ GCodeResult GCodes::ProbeTool(GCodeBuffer& gb, const StringRef& reply)
 			{
 				moveBuffer.endStopsToCheck = UseSpecialEndstop;
 				SetBit(moveBuffer.endStopsToCheck, endStopToUse);
+
+				if (gb.Seen('L') && gb.GetIValue() == 0)
+				{
+					// By default custom endstops are active-high when triggered, so allow this to be inverted
+					moveBuffer.endStopsToCheck |= ActiveLowEndstop;
+				}
 			}
 			moveBuffer.xAxes = DefaultXAxisMapping;
 			moveBuffer.yAxes = DefaultYAxisMapping;
@@ -886,7 +889,7 @@ GCodeResult GCodes::ProbeTool(GCodeBuffer& gb, const StringRef& reply)
 			// Deal with feed rate
 			if (gb.Seen(feedrateLetter))
 			{
-				const float rate = gb.GetFValue() * distanceScale;
+				const float rate = gb.GetDistance();
 				gb.MachineState().feedRate = rate * SecondsToMinutes;	// don't apply the speed factor to homing and other special moves
 			}
 			moveBuffer.feedRate = gb.MachineState().feedRate;
@@ -897,6 +900,70 @@ GCodeResult GCodes::ProbeTool(GCodeBuffer& gb, const StringRef& reply)
 		}
 	}
 
+	return GCodeResult::ok;
+}
+
+GCodeResult GCodes::FindCenterOfCavity(GCodeBuffer& gb, const StringRef& reply, const bool towardsMin)
+{
+	if (reprap.GetCurrentTool() == nullptr)
+	{
+		reply.copy("No tool selected!");
+		return GCodeResult::error;
+	}
+
+	if (!LockMovementAndWaitForStandstill(gb))
+	{
+		return GCodeResult::notFinished;
+	}
+
+	for (size_t axis = 0; axis < numVisibleAxes; axis++)
+	{
+		if (gb.Seen(axisLetters[axis]))
+		{
+
+			SetMoveBufferDefaults();
+
+			// Prepare a move similar to G1 .. S3
+			moveBuffer.moveType = 3;
+			SetBit(moveBuffer.endStopsToCheck, axis);
+			axesToSenseLength = 0;
+
+			doingArcMove = false;
+
+			moveBuffer.canPauseAfter = false;
+			moveBuffer.hasExtrusion = false;
+
+			moveBuffer.coords[axis] = towardsMin ? platform.AxisMinimum(axis) : platform.AxisMaximum(axis);
+
+			// Deal with feed rate
+			if (gb.Seen(feedrateLetter))
+			{
+				const float rate = gb.ConvertDistance(gb.GetFValue());
+				gb.MachineState().feedRate = rate * SecondsToMinutes;	// don't apply the speed factor to homing and other special moves
+			}
+			else
+			{
+				reply.copy("No feed rate provided.");
+				return GCodeResult::badOrMissingParameter;
+			}
+			moveBuffer.feedRate = gb.MachineState().feedRate;
+
+			if (towardsMin)
+			{
+				gb.SetState(GCodeState::findCenterOfCavityMin);
+			}
+			else
+			{
+				gb.SetState(GCodeState::findCenterOfCavityMax);
+			}
+
+			// Kick off new movement
+			NewMoveAvailable(1);
+
+			// Only do one axis at a time
+			break;
+		}
+	}
 	return GCodeResult::ok;
 }
 
@@ -1032,7 +1099,7 @@ GCodeResult GCodes::SendI2c(GCodeBuffer& gb, const StringRef &reply)
 #if defined(I2C_IFACE)
 	if (gb.Seen('A'))
 	{
-		const uint32_t address = gb.GetUIValueMaybeHex();
+		const uint32_t address = gb.GetUIValue();
 		uint32_t numToReceive = 0;
 		bool seenR;
 		gb.TryGetUIValue('R', numToReceive, seenR);
@@ -1060,12 +1127,8 @@ GCodeResult GCodes::SendI2c(GCodeBuffer& gb, const StringRef &reply)
 				bValues[i] = (uint8_t)values[i];
 			}
 
-			platform.InitI2c();
-			size_t bytesTransferred;
-			{
-				MutexLocker lock(Tasks::GetI2CMutex());
-				bytesTransferred = I2C_IFACE.Transfer(address, bValues, numToSend, numToReceive);
-			}
+			I2C::Init();
+			const size_t bytesTransferred = I2C::Transfer(address, bValues, numToSend, numToReceive);
 
 			if (bytesTransferred < numToSend)
 			{
@@ -1104,20 +1167,16 @@ GCodeResult GCodes::ReceiveI2c(GCodeBuffer& gb, const StringRef &reply)
 #if defined(I2C_IFACE)
 	if (gb.Seen('A'))
 	{
-		const uint32_t address = gb.GetUIValueMaybeHex();
+		const uint32_t address = gb.GetUIValue();
 		if (gb.Seen('B'))
 		{
 			const uint32_t numBytes = gb.GetUIValue();
 			if (numBytes > 0 && numBytes <= MaxI2cBytes)
 			{
-				platform.InitI2c();
+				I2C::Init();
 
 				uint8_t bValues[MaxI2cBytes];
-				size_t bytesRead;
-				{
-					MutexLocker lock(Tasks::GetI2CMutex());
-					bytesRead = I2C_IFACE.Transfer(address, bValues, 0, numBytes);
-				}
+				const size_t bytesRead = I2C::Transfer(address, bValues, 0, numBytes);
 
 				reply.copy("Received");
 				if (bytesRead == 0)
@@ -1197,7 +1256,7 @@ GCodeResult GCodes::ConfigureDriver(GCodeBuffer& gb,const  StringRef& reply)
 					}
 				}
 
-				if (gb.TryGetUIValueMaybeHex('C', val, seen))		// set chopper control register
+				if (gb.TryGetUIValue('C', val, seen))		// set chopper control register
 				{
 					if (!SmartDrivers::SetRegister(drive, SmartDriverRegister::chopperControl, val))
 					{
@@ -1424,6 +1483,16 @@ GCodeResult GCodes::SetHeaterModel(GCodeBuffer& gb, const StringRef& reply)
 		}
 	}
 	return GCodeResult::ok;
+}
+
+// Change a live extrusion factor
+void GCodes::ChangeExtrusionFactor(unsigned int extruder, float factor)
+{
+	if (segmentsLeft != 0 && !moveBuffer.isFirmwareRetraction)
+	{
+		moveBuffer.coords[extruder + numTotalAxes] *= factor/extrusionFactors[extruder];	// last move not gone, so update it
+	}
+	extrusionFactors[extruder] = factor;
 }
 
 // End

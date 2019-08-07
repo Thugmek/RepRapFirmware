@@ -28,6 +28,8 @@ Licence: GPL
 #include <climits>		// for CHAR_BIT
 
 #include "ecv.h"
+#undef value			// needed because we include <optional>
+
 #include "Core.h"
 
 typedef uint16_t PwmFrequency;		// type used to represent a PWM frequency. 0 sometimes means "default".
@@ -105,7 +107,7 @@ typedef double floatc_t;					// type of matrix element used for calibration
 typedef float floatc_t;						// type of matrix element used for calibration
 #endif
 
-typedef uint32_t AxesBitmap;				// Type of a bitmap representing a set of axes
+typedef uint16_t AxesBitmap;				// Type of a bitmap representing a set of axes
 typedef uint32_t DriversBitmap;				// Type of a bitmap representing a set of driver numbers
 typedef uint32_t FansBitmap;				// Type of a bitmap representing a set of fan numbers
 typedef uint16_t Pwm_t;						// Type of a PWM value when we don't want to use floats
@@ -179,6 +181,37 @@ void ListDrivers(const StringRef& str, DriversBitmap drivers);
 
 // UTF8 code for the degree-symbol
 #define DEGREE_SYMBOL	"\xC2\xB0"	// Unicode degree-symbol as UTF8
+
+// Functions to change the base priority, to shut out interrupts up to a priority level
+
+// From section 3.12.7 of http://infocenter.arm.com/help/topic/com.arm.doc.dui0553b/DUI0553.pdf:
+// When you write to BASEPRI_MAX, the instruction writes to BASEPRI only if either:
+// • Rn is non-zero and the current BASEPRI value is 0
+// • Rn is non-zero and less than the current BASEPRI value
+__attribute__( ( always_inline ) ) __STATIC_INLINE void __set_BASEPRI_MAX(uint32_t value)
+{
+  __ASM volatile ("MSR basepri_max, %0" : : "r" (value) : "memory");
+}
+
+// Get the base priority and shut out interrupts lower than or equal to a specified priority
+inline uint32_t ChangeBasePriority(uint32_t prio)
+{
+	const uint32_t oldPrio = __get_BASEPRI();
+	__set_BASEPRI_MAX(prio << (8 - __NVIC_PRIO_BITS));
+	return oldPrio;
+}
+
+// Restore the base priority following a call to ChangeBasePriority
+inline void RestoreBasePriority(uint32_t prio)
+{
+	__set_BASEPRI(prio);
+}
+
+// Set the base priority when we are not interested in the existing value i.e. definitely in non-interrupt code
+inline void SetBasePriority(uint32_t prio)
+{
+	__set_BASEPRI(prio << (8 - __NVIC_PRIO_BITS));
+}
 
 // Classes to facilitate range-based for loops that iterate from 0 up to just below a limit
 template<class T> class SimpleRangeIterator
@@ -302,13 +335,31 @@ constexpr float RadiansToDegrees = 180.0/3.141592653589793;
 typedef uint32_t FilePosition;
 const FilePosition noFilePosition = 0xFFFFFFFF;
 
+#ifdef RTOS
+
+// Task priorities
+namespace TaskPriority
+{
+	static constexpr int SpinPriority = 1;							// priority for tasks that rarely block
+	static constexpr int HeatPriority = 2;
+	static constexpr int DhtPriority = 2;
+	static constexpr int TmcPriority = 2;
+	static constexpr int AinPriority = 2;
+	static constexpr int DueXPriority = 3;
+	static constexpr int LaserPriority = 3;
+	static constexpr int CanSenderPriority = 3;
+	static constexpr int CanReceiverPriority = 3;
+}
+
+#endif
+
 //-------------------------------------------------------------------------------------------------
 // Interrupt priorities - must be chosen with care! 0 is the highest priority, 15 is the lowest.
 // This interacts with FreeRTOS config constant configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY which is currently defined as 3 for the SAME70 and 5 for the SAM4x.
 // ISRs with better (numerically lower) priorities than this value cannot make FreeRTOS calls, but those interrupts wont be disabled even in FreeRTOS critical sections.
 
-#if SAME70
-// We have only 8 interrupt priority levels
+#if __NVIC_PRIO_BITS == 3
+// We have only 8 interrupt priority levels on the SAME70
 // Use priority 2 or lower for interrupts where low latency is critical and FreeRTOS calls are not needed.
 
 const uint32_t NvicPriorityWatchdog = 0;		// the secondary watchdog has the highest priority
@@ -333,11 +384,11 @@ const uint32_t NvicPriorityEthernet = 6;		// priority for Ethernet interface
 const uint32_t NvicPriorityDMA = 6;				// end-of-DMA interrupt used by TMC drivers and HSMCI
 const uint32_t NvicPrioritySpi = 6;				// SPI is used for network transfers on Duet WiFi/Duet vEthernet
 
-#else
+#elif __NVIC_PRIO_BITS == 4
 // We have 16 priority levels
 // Use priority 4 or lower for interrupts where low latency is critical and FreeRTOS calls are not needed.
 
-# if SAM4E
+# if SAM4E || __LPC17xx__
 const uint32_t NvicPriorityWatchdog = 0;		// the secondary watchdog has the highest priority
 # endif
 

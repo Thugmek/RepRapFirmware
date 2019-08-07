@@ -24,6 +24,10 @@
 #include "ESP8266WiFi/WiFiInterface.h"
 #endif
 
+#if HAS_RTOSPLUSTCP_NETWORKING
+#include "RTOSPlusTCPEthernet/RTOSPlusTCPEthernetInterface.h"
+#endif
+
 #include "Platform.h"
 #include "RepRap.h"
 #include "HttpResponder.h"
@@ -35,20 +39,29 @@
 
 #ifdef RTOS
 
+#if __LPC17xx__
+constexpr size_t NetworkStackWords = 470;
+#else
 constexpr size_t NetworkStackWords = 550;
+#endif
+
 static Task<NetworkStackWords> networkTask;
 
 #endif
 
 Network::Network(Platform& p) : platform(p), responders(nullptr), nextResponderToPoll(nullptr)
 {
-#if defined(DUET3) || defined(SAME70XPLD)
+#if defined(DUET3_V03) || defined(SAME70XPLD)
 	interfaces[0] = new LwipEthernetInterface(p);
 	interfaces[1] = new WiFiInterface(p);
+#elif defined(DUET3_V05)
+	interfaces[0] = new LwipEthernetInterface(p);
 #elif defined(DUET_NG)
 	interfaces[0] = nullptr;			// we set this up in Init()
 #elif defined(DUET_M)
 	interfaces[0] = new W5500Interface(p);
+#elif defined(__LPC17xx__)
+	interfaces[0] = new RTOSPlusTCPEthernetInterface(p);
 #else
 # error Unknown board
 #endif
@@ -82,7 +95,9 @@ DEFINE_GET_OBJECT_MODEL_TABLE(Network)
 void Network::Init()
 {
 	httpMutex.Create("HTTP");
+#if SUPPORT_TELNET
 	telnetMutex.Create("Telnet");
+#endif
 
 #if defined(DUET_NG)
 	interfaces[0] = (platform.IsDuetWiFi()) ? static_cast<NetworkInterface*>(new WiFiInterface(platform)) : static_cast<NetworkInterface*>(new W5500Interface(platform));
@@ -90,16 +105,25 @@ void Network::Init()
 
 	// Create the responders
 	HttpResponder::InitStatic();
+
+#if SUPPORT_TELNET
 	TelnetResponder::InitStatic();
 
 	for (size_t i = 0; i < NumTelnetResponders; ++i)
 	{
 		responders = new TelnetResponder(responders);
 	}
+#endif
+
+#if SUPPORT_FTP
+	FtpResponder::InitStatic();
+
 	for (size_t i = 0; i < NumFtpResponders; ++i)
 	{
 		responders = new FtpResponder(responders);
 	}
+#endif
+
 	for (size_t i = 0; i < NumHttpResponders; ++i)
 	{
 		responders = new HttpResponder(responders);
@@ -133,7 +157,40 @@ GCodeResult Network::DisableProtocol(unsigned int interface, NetworkProtocol pro
 {
 	if (interface < NumNetworkInterfaces)
 	{
-		return interfaces[interface]->DisableProtocol(protocol, reply);
+		NetworkInterface * const iface = interfaces[interface];
+		const GCodeResult ret = iface->DisableProtocol(protocol, reply);
+		if (ret == GCodeResult::ok)
+		{
+			for (NetworkResponder *r = responders; r != nullptr; r = r->GetNext())
+			{
+				r->Terminate(protocol, iface);
+			}
+
+			// The following isn't quite right, because we shouldn't free up output buffers if another network interface is still serving this protocol.
+			// However, the only supported hardware with more than one network interface is the early Duet 3 prototype, so we'll leave this be.
+			switch (protocol)
+			{
+			case HttpProtocol:
+				HttpResponder::Disable();			// free up output buffers etc.
+				break;
+
+#if SUPPORT_FTP
+			case FtpProtocol:
+				FtpResponder::Disable();
+				break;
+#endif
+
+#if SUPPORT_TELNET
+			case TelnetProtocol:
+				TelnetResponder::Disable();
+				break;
+#endif
+
+			default:
+				break;
+			}
+		}
+		return ret;
 	}
 	else
 	{
@@ -158,7 +215,26 @@ GCodeResult Network::EnableInterface(unsigned int interface, int mode, const Str
 {
 	if (interface < NumNetworkInterfaces)
 	{
-		return interfaces[interface]->EnableInterface(mode, ssid, reply);
+		NetworkInterface * const iface = interfaces[interface];
+		const GCodeResult ret = iface->EnableInterface(mode, ssid, reply);
+		if (ret == GCodeResult::ok && mode < 1)			// if disabling the interface
+		{
+			for (NetworkResponder *r = responders; r != nullptr; r = r->GetNext())
+			{
+				r->Terminate(AnyProtocol, iface);
+			}
+
+			// The following isn't quite right, because we shouldn't free up output buffers if another network interface is still enabled and serving this protocol.
+			// However, the only supported hardware with more than one network interface is the early Duet 3 prototype, so we'll leave this be.
+			HttpResponder::Disable();
+#if SUPPORT_FTP
+			FtpResponder::Disable();
+#endif
+#if SUPPORT_TELNET
+			TelnetResponder::Disable();
+#endif
+		}
+		return ret;
 	}
 	reply.printf("Invalid network interface '%d'\n", interface);
 	return GCodeResult::error;
@@ -252,7 +328,7 @@ void Network::Activate()
 	}
 
 #ifdef RTOS
-	networkTask.Create(NetworkLoop, "NETWORK", nullptr, TaskBase::SpinPriority);
+	networkTask.Create(NetworkLoop, "NETWORK", nullptr, TaskPriority::SpinPriority);
 #endif
 
 }
@@ -266,6 +342,14 @@ void Network::Exit()
 			iface->Exit();
 		}
 	}
+
+	HttpResponder::Disable();
+#if SUPPORT_FTP
+	FtpResponder::Disable();
+#endif
+#if SUPPORT_TELNET
+	TelnetResponder::Disable();
+#endif
 
 	// TODO: close down the network and suspend the network task. Not trivial because currently, the caller may be the network task.
 }
@@ -469,8 +553,10 @@ void Network::HandleHttpGCodeReply(const char *msg)
 
 void Network::HandleTelnetGCodeReply(const char *msg)
 {
+#if SUPPORT_TELNET
 	MutexLocker lock(telnetMutex);
 	TelnetResponder::HandleGCodeReply(msg);
+#endif
 }
 
 void Network::HandleHttpGCodeReply(OutputBuffer *buf)
@@ -481,8 +567,12 @@ void Network::HandleHttpGCodeReply(OutputBuffer *buf)
 
 void Network::HandleTelnetGCodeReply(OutputBuffer *buf)
 {
+#if SUPPORT_TELNET
 	MutexLocker lock(telnetMutex);
 	TelnetResponder::HandleGCodeReply(buf);
+#else
+	OutputBuffer::Release(buf);
+#endif
 }
 
 uint32_t Network::GetHttpReplySeq()

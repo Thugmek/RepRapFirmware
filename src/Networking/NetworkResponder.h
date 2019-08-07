@@ -17,6 +17,7 @@
 
 // Forward declarations
 class NetworkResponder;
+class NetworkInterface;
 class Socket;
 
 // Network responder base class
@@ -26,11 +27,11 @@ public:
 	NetworkResponder *GetNext() const { return next; }
 	virtual bool Spin() = 0;							// do some work, returning true if we did anything significant
 	virtual bool Accept(Socket *s, NetworkProtocol protocol) = 0;	// ask the responder to accept this connection, returns true if it did
-	virtual void Terminate(NetworkProtocol protocol) = 0;		// terminate the responder if it is serving the specified protocol
+	virtual void Terminate(NetworkProtocol protocol, NetworkInterface *interface) = 0;	// terminate the responder if it is serving the specified protocol on the specified interface
 	virtual void Diagnostics(MessageType mtype) const = 0;
 
 protected:
-	// States machine control. Not all derived classes use all states.
+	// State machine control. Not all derived classes use all states.
 	enum class ResponderState
 	{
 		free = 0,										// ready to be allocated
@@ -59,10 +60,6 @@ protected:
 	virtual void SendData();
 	virtual void ConnectionLost();
 
-	void StartUpload(FileStore *file, const char *fileName);
-	void FinishUpload(uint32_t fileLength, time_t fileLastModified);
-	virtual void CancelUpload();
-
 	IPAddress GetRemoteIP() const;
 	void ReportOutputBufferExhaustion(const char *sourceFile, int line);
 
@@ -81,13 +78,6 @@ protected:
 	OutputStack outStack;								// not volatile because only one task accesses it
 	FileStore *fileBeingSent;
 	NetworkBuffer *fileBuffer;
-
-	// File uploads
-	FileData fileBeingUploaded;
-	String<MaxFilenameLength> filenameBeingUploaded;
-	uint32_t postFileLength, uploadedBytes;				// how many POST bytes do we expect and how many have already been written?
-	time_t fileLastModified;
-	bool uploadError;
 };
 
 #endif /* SRC_NETWORKING_NETWORKRESPONDER_H_ */

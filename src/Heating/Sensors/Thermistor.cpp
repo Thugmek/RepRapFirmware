@@ -100,7 +100,7 @@ GCodeResult Thermistor::Configure(unsigned int mCode, unsigned int heater, GCode
 }
 
 // Get the temperature
-TemperatureError Thermistor::GetTemperature(float& t)
+TemperatureError Thermistor::TryGetTemperature(float& t)
 {
 	const volatile ThermistorAveragingFilter& tempFilter = reprap.GetPlatform().GetAdcFilter(thermistorInputChannel);
 
@@ -114,50 +114,60 @@ TemperatureError Thermistor::GetTemperature(float& t)
 		const int32_t averagedVrefReading = vrefFilter.GetSum()/(ThermistorAverageReadings >> Thermistor::AdcOversampleBits);
 
 		// VREF is the measured voltage at VREF less the drop of a 15 ohm resistor. Assume that the maximum load is four 2K2 resistors and one 4K7 resistor to ground = 492 ohms.
-		// VSSA is the voltage measured across the VSSA fuse. We assume the same maximum load and the same 15 ohms resistance for the fuse.
+		// VSSA is the voltage measured across the VSSA fuse. We assume the same maximum load and the same 15 ohms maximum resistance for the fuse.
 		// Assume a maximum ADC reading offset of 100.
 		constexpr int32_t maxDrop = ((4096 << Thermistor::AdcOversampleBits) * 15)/492 + (100 << Thermistor::AdcOversampleBits);
 
-		if (   averagedVrefReading < (4096 << Thermistor::AdcOversampleBits) - maxDrop
-			|| averagedVssaReading > maxDrop
-		   )
+		if (averagedVrefReading < (4096 << Thermistor::AdcOversampleBits) - maxDrop)
 		{
-//debugPrintf("vref=%" PRIi32 " vssa=%" PRIi32 " maxdrop=%" PRIi32 "\n", averagedVrefReading, averagedVssaReading, maxDrop);
-			t = BAD_ERROR_TEMPERATURE;
-			return TemperatureError::overOrUnderVoltage;
+			t = BadErrorTemperature;
+			return TemperatureError::badVref;
+		}
+		if (averagedVssaReading > maxDrop)
+		{
+			t = BadErrorTemperature;
+			return TemperatureError::badVssa;
 		}
 #else
 	if (tempFilter.IsValid())
 	{
-		const int32_t averagedVssaReading = 2 * adcLowOffset;					// double the offset because we increased AdcOversampleBits from 1 to 2
-		const int32_t averagedVrefReading = AdcRange + 2 * adcHighOffset;		// double the offset because we increased AdcOversampleBits from 1 to 2
 #endif
 		const int32_t averagedTempReading = tempFilter.GetSum()/(ThermistorAverageReadings >> Thermistor::AdcOversampleBits);
 
 		// Calculate the resistance
+#if HAS_VREF_MONITOR
+		const float denom = (float)(averagedVrefReading - averagedTempReading);
+#else
+		const int32_t averagedVrefReading = AdcRange + 2 * adcHighOffset;		// double the offset because we increased AdcOversampleBits from 1 to 2
 		const float denom = (float)(averagedVrefReading - averagedTempReading) - 0.5;
+#endif
 		if (denom <= 0.0)
 		{
 			t = ABS_ZERO;
 			return TemperatureError::openCircuit;
 		}
 
-		const float resistance = seriesR * ((float)(averagedTempReading - averagedVssaReading) + 0.5)/denom;
+#if HAS_VREF_MONITOR
+		const float resistance = seriesR * (float)(averagedTempReading - averagedVssaReading)/denom;
+#else
+		const int32_t averagedVssaReading = 2 * adcLowOffset;					// double the offset because we increased AdcOversampleBits from 1 to 2
+		float resistance = seriesR * ((float)(averagedTempReading - averagedVssaReading) + 0.5)/denom;
+# ifdef DUET_NG
+		// The VSSA PTC fuse on the later Duets has a resistance of a few ohms. I measured 1.0 ohms on two revision 1.04 Duet WiFi boards.
+		resistance -= 1.0;														// assume 1.0 ohms and only one PT1000 sensor
+# endif
+#endif
 		if (isPT1000)
 		{
 			// We want 100 * the equivalent PT100 resistance, which is 10 * the actual PT1000 resistance
-			uint16_t ohmsx100 = (uint16_t)rintf(constrain<float>(resistance * 10, 0.0, 65535.0));
-#ifdef DUET_NG
-			// The VSSA PTC fuse on the later Duets has a resistance of a few ohms
-			ohmsx100 -= 20;			// assume 2 ohms and only one PT1000 sensor
-#endif
+			const uint16_t ohmsx100 = (uint16_t)rintf(constrain<float>(resistance * 10, 0.0, 65535.0));
 			return GetPT100Temperature(t, ohmsx100);
 		}
 
 		// Else it's a thermistor
 		const float logResistance = log(resistance);
 		const float recipT = shA + shB * logResistance + shC * logResistance * logResistance * logResistance;
-		const float temp =  (recipT > 0.0) ? (1.0/recipT) + ABS_ZERO : BAD_ERROR_TEMPERATURE;
+		const float temp =  (recipT > 0.0) ? (1.0/recipT) + ABS_ZERO : BadErrorTemperature;
 
 		if (temp < MinimumConnectedTemperature)
 		{
@@ -171,8 +181,8 @@ TemperatureError Thermistor::GetTemperature(float& t)
 	}
 
 	// Filter is not ready yet
-	t = BAD_ERROR_TEMPERATURE;
-	return TemperatureError::busBusy;
+	t = BadErrorTemperature;
+	return TemperatureError::notReady;
 }
 
 // Calculate shA and shB from the other parameters

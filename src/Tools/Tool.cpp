@@ -34,7 +34,7 @@
 Tool * Tool::freelist = nullptr;
 
 // Create a new tool and return a pointer to it. If an error occurs, put an error message in 'reply' and return nullptr.
-/*static*/ Tool *Tool::Create(int toolNumber, const char *name, long d[], size_t dCount, long h[], size_t hCount, AxesBitmap xMap, AxesBitmap yMap, FansBitmap fanMap, const StringRef& reply)
+/*static*/ Tool *Tool::Create(unsigned int toolNumber, const char *name, int32_t d[], size_t dCount, int32_t h[], size_t hCount, AxesBitmap xMap, AxesBitmap yMap, FansBitmap fanMap, const StringRef& reply)
 {
 	const size_t numExtruders = reprap.GetGCodes().GetNumExtruders();
 	if (dCount > ARRAY_SIZE(Tool::drives))
@@ -97,8 +97,9 @@ Tool * Tool::freelist = nullptr;
 	const size_t nameLength = strlen(name);
 	if (nameLength != 0)
 	{
-		t->name = new char[nameLength + 1];
-		SafeStrncpy(t->name, name, nameLength + 1);
+		char *toolName = new char[nameLength + 1];
+		SafeStrncpy(toolName, name, nameLength + 1);
+		t->name = toolName;
 	}
 	else
 	{
@@ -106,10 +107,10 @@ Tool * Tool::freelist = nullptr;
 	}
 
 	t->next = nullptr;
-	t->myNumber = toolNumber;
+	t->myNumber = (uint16_t)toolNumber;
 	t->state = ToolState::off;
-	t->driveCount = dCount;
-	t->heaterCount = hCount;
+	t->driveCount = (uint8_t)dCount;
+	t->heaterCount = (uint8_t)hCount;
 	t->xMapping = xMap;
 	t->yMapping = yMap;
 	t->fanMapping = fanMap;
@@ -159,30 +160,44 @@ Tool * Tool::freelist = nullptr;
 
 void Tool::Print(const StringRef& reply) const
 {
-	reply.printf("Tool %d - ", myNumber);
+	reply.printf("Tool %u - ", myNumber);
 	if (name != nullptr)
 	{
 		reply.catf("name: %s; ", name);
 	}
 
-	reply.cat("drives:");
-	char sep = ' ';
-	for (size_t drive = 0; drive < driveCount; drive++)
+	if (driveCount == 0)
 	{
-		reply.catf("%c%d", sep, drives[drive]);
-		sep = ',';
+		reply.cat("no drives");
+	}
+	else
+	{
+		reply.cat("drives:");
+		char sep = ' ';
+		for (size_t drive = 0; drive < driveCount; drive++)
+		{
+			reply.catf("%c%d", sep, drives[drive]);
+			sep = ',';
+		}
 	}
 
-	reply.cat("; heaters (active/standby temps):");
-	sep = ' ';
-	for (size_t heater = 0; heater < heaterCount; heater++)
+	if (heaterCount == 0)
 	{
-		reply.catf("%c%d (%.1f/%.1f)", sep, heaters[heater], (double)activeTemperatures[heater], (double)standbyTemperatures[heater]);
-		sep = ',';
+		reply.cat("; no heaters");
+	}
+	else
+	{
+		reply.cat("; heaters (active/standby temps):");
+		char sep = ' ';
+		for (size_t heater = 0; heater < heaterCount; heater++)
+		{
+			reply.catf("%c%d (%.1f/%.1f)", sep, heaters[heater], (double)activeTemperatures[heater], (double)standbyTemperatures[heater]);
+			sep = ',';
+		}
 	}
 
 	reply.cat("; xmap:");
-	sep = ' ';
+	char sep = ' ';
 	for (size_t xi = 0; xi < MaxAxes; ++xi)
 	{
 		if ((xMapping & (1u << xi)) != 0)
@@ -309,10 +324,15 @@ void Tool::Activate()
 
 void Tool::Standby()
 {
+	const Tool * const currentTool = reprap.GetCurrentTool();
 	for (size_t heater = 0; heater < heaterCount; heater++)
 	{
-		reprap.GetHeat().SetStandbyTemperature(heaters[heater], standbyTemperatures[heater]);
-		reprap.GetHeat().Standby(heaters[heater], this);
+		// Don't switch a heater to standby if the active tool is using it and is different from this tool
+		if (currentTool == this || currentTool == nullptr || !currentTool->UsesHeater(heater))
+		{
+			reprap.GetHeat().SetStandbyTemperature(heaters[heater], standbyTemperatures[heater]);
+			reprap.GetHeat().Standby(heaters[heater], this);
+		}
 	}
 	state = ToolState::standby;
 }
@@ -365,7 +385,7 @@ void Tool::DefineMix(const float m[])
 }
 
 // Write the tool's settings to file returning true if successful
-bool Tool::WriteSettings(FileStore *f) const
+bool Tool::WriteSettings(FileStore *f, bool isCurrent) const
 {
 	char bufSpace[50];
 	StringRef buf(bufSpace, ARRAY_SIZE(bufSpace));
@@ -394,8 +414,8 @@ bool Tool::WriteSettings(FileStore *f) const
 
 	if (ok && state != ToolState::off)
 	{
-		// Select tool
-		buf.printf("T%d P0\n", myNumber);
+		// Select tool. Don't run tool change files unless it is the current tool, and in that case don't run the tfree file.
+		buf.printf("T%d P%u\n", myNumber, (isCurrent) ? 6 : 0);
 		ok = f->Write(buf.c_str());
 	}
 
@@ -480,6 +500,35 @@ void Tool::SetToolHeaterStandbyTemperature(size_t heaterNumber, float temp)
 			}
 		}
 	}
+}
+
+void Tool::IterateExtruders(std::function<void(unsigned int)> f) const
+{
+	for (size_t i = 0; i < driveCount; ++i)
+	{
+		f(drives[i]);
+	}
+}
+
+void Tool::IterateHeaters(std::function<void(int)> f) const
+{
+	for (size_t i = 0; i < heaterCount; ++i)
+	{
+		f(heaters[i]);
+	}
+}
+
+// Return true if this tool uses the specified heater
+bool Tool::UsesHeater(int8_t heater) const
+{
+	for (size_t i = 0; i < heaterCount; ++i)
+	{
+		if (heaters[i] == heater)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 // End

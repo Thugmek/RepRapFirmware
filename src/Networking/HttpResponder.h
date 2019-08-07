@@ -8,18 +8,19 @@
 #ifndef SRC_NETWORKING_HTTPRESPONDER_H_
 #define SRC_NETWORKING_HTTPRESPONDER_H_
 
-#include "NetworkResponder.h"
+#include "UploadingNetworkResponder.h"
 
-class HttpResponder : public NetworkResponder
+class HttpResponder : public UploadingNetworkResponder
 {
 public:
 	HttpResponder(NetworkResponder *n);
 	bool Spin() override;								// do some work, returning true if we did anything significant
 	bool Accept(Socket *s, NetworkProtocol protocol) override;	// ask the responder to accept this connection, returns true if it did
-	void Terminate(NetworkProtocol protocol) override;			// terminate the responder if it is serving the specified protocol
+	void Terminate(NetworkProtocol protocol, NetworkInterface *interface) override;	// terminate the responder if it is serving the specified protocol on the specified interface
 	void Diagnostics(MessageType mtype) const override;
 
 	static void InitStatic();
+	static void Disable();
 	static void HandleGCodeReply(const char *reply);
 	static void HandleGCodeReply(OutputBuffer *reply);
 	static uint32_t GetReplySeq() { return seq; }
@@ -106,7 +107,7 @@ private:
 
 	// rr_fileinfo requests
 	uint32_t startedProcessingRequestAt;			// when we started processing the current HTTP request
-	char filenameBeingProcessed[MaxFilenameLength];	// The filename being processed (for rr_fileinfo)
+	// rr_fileinfo also uses fileBeingProcessed in the networkResponder class
 
 	// Keeping track of HTTP sessions
 	static HttpSession sessions[MaxHttpSessions];

@@ -6,6 +6,9 @@
  */
 
 #include "TelnetResponder.h"
+
+#if SUPPORT_TELNET
+
 #include "Socket.h"
 #include "OutputMemory.h"
 #include "GCodes/GCodes.h"
@@ -39,9 +42,9 @@ bool TelnetResponder::Accept(Socket *s, NetworkProtocol protocol)
 }
 
 // This is called to force termination if we implement the specified protocol
-void TelnetResponder::Terminate(NetworkProtocol protocol)
+void TelnetResponder::Terminate(NetworkProtocol protocol, NetworkInterface *interface)
 {
-	if (responderState != ResponderState::free && (protocol == TelnetProtocol || protocol == AnyProtocol))
+	if (responderState != ResponderState::free && (protocol == TelnetProtocol || protocol == AnyProtocol) && skt != nullptr && skt->GetInterface() == interface)
 	{
 		ConnectionLost();
 	}
@@ -294,6 +297,16 @@ void TelnetResponder::ProcessLine()
 	gcodeReplyMutex.Create("TelnetGCodeReply");
 }
 
+// This is called when we are shutting down the network or just this protocol. It may be called even if this protocol isn't enabled.
+/*static*/ void TelnetResponder::Disable()
+{
+	MutexLocker lock(gcodeReplyMutex);
+
+	clientsServed = 0;
+	numSessions = 0;
+	OutputBuffer::ReleaseAll(gcodeReply);
+}
+
 /*static*/ void TelnetResponder::HandleGCodeReply(const char *reply)
 {
 	if (reply != nullptr && numSessions > 0)
@@ -380,5 +393,7 @@ unsigned int TelnetResponder::numSessions = 0;
 unsigned int TelnetResponder::clientsServed = 0;
 OutputBuffer *TelnetResponder::gcodeReply = nullptr;
 Mutex TelnetResponder::gcodeReplyMutex;
+
+#endif
 
 // End

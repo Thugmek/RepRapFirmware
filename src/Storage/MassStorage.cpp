@@ -118,7 +118,7 @@ void MassStorage::ReleaseWriteBuffer(FileWriteBuffer *buffer)
 	freeWriteBuffers = buffer;
 }
 
-FileStore* MassStorage::OpenFile(const char* directory, const char* fileName, OpenMode mode, uint32_t preAllocSize)
+FileStore* MassStorage::OpenFile(const char* filePath, OpenMode mode, uint32_t preAllocSize)
 {
 
 	{
@@ -127,7 +127,7 @@ FileStore* MassStorage::OpenFile(const char* directory, const char* fileName, Op
 		{
 			if (files[i].usageMode == FileUseMode::free)
 			{
-				return (files[i].Open(directory, fileName, mode, preAllocSize)) ? &files[i]: nullptr;
+				return (files[i].Open(filePath, mode, preAllocSize)) ? &files[i]: nullptr;
 			}
 		}
 	}
@@ -150,47 +150,36 @@ void MassStorage::CloseAllFiles()
 
 /*static*/ void MassStorage::CombineName(const StringRef& outbuf, const char* directory, const char* fileName)
 {
-	outbuf.Clear();
-	size_t outIndex = 0;
-	size_t inIndex = 0;
-
-	// DC 2015-11-25 Only prepend the directory if the filename does not have an absolute path or volume specifier
-	if (directory != nullptr && fileName[0] != '/' && (strlen(fileName) < 2 || !isdigit(fileName[0]) || fileName[1] != ':'))
+	bool hadError = false;
+	if (directory != nullptr && directory[0] != 0 && fileName[0] != '/' && (strlen(fileName) < 2 || !isdigit(fileName[0]) || fileName[1] != ':'))
 	{
-		while (directory[inIndex] != 0 && directory[inIndex] != '\n')
+		hadError = outbuf.copy(directory);
+		if (!hadError)
 		{
-			outbuf.Pointer()[outIndex] = directory[inIndex];
-			inIndex++;
-			outIndex++;
-			if (outIndex >= outbuf.Capacity())
+			const size_t len = outbuf.strlen();
+			if (len != 0 && outbuf[len - 1] != '/')
 			{
-				reprap.GetPlatform().MessageF(ErrorMessage, "CombineName() buffer overflow");
-				outbuf.copy("?????");
-				return;
+				hadError = outbuf.cat('/');
 			}
 		}
-
-		if (inIndex > 0 && directory[inIndex - 1] != '/')
-		{
-			outbuf.Pointer()[outIndex] = '/';
-			outIndex++;
-		}
-		inIndex = 0;
 	}
-
-	while (fileName[inIndex] != 0 && fileName[inIndex] != '\n')
+	else
 	{
-		if (outIndex >= outbuf.Capacity())
-		{
-			reprap.GetPlatform().Message(ErrorMessage, "file name too long");
-			outbuf.copy("?????");
-			return;
-		}
-		outbuf.Pointer()[outIndex] = fileName[inIndex];
-		inIndex++;
-		outIndex++;
+		outbuf.Clear();
 	}
-	outbuf.Pointer()[outIndex] = 0;
+	if (!hadError)
+	{
+		hadError = outbuf.cat(fileName);
+	}
+	if (hadError)
+	{
+		reprap.GetPlatform().MessageF(ErrorMessage, "Filename too long: cap=%u, dir=%.12s%s name=%.12s%s\n",
+										outbuf.Capacity(),
+										directory, (strlen(directory) > 12 ? "..." : ""),
+										fileName, (strlen(fileName) > 12 ? "..." : "")
+									 );
+		outbuf.copy("?????");
+	}
 }
 
 // Open a directory to read a file list. Returns true if it contains any files, false otherwise.
@@ -343,11 +332,8 @@ const char* MassStorage::GetMonthName(const uint8_t month)
 }
 
 // Delete a file or directory
-bool MassStorage::Delete(const char* directory, const char* fileName)
+bool MassStorage::Delete(const char* filePath)
 {
-	String<MaxFilenameLength> location;
-	CombineName(location.GetRef(), directory, fileName);
-
 	FRESULT unlinkReturn;
 	bool isOpen = false;
 
@@ -357,7 +343,7 @@ bool MassStorage::Delete(const char* directory, const char* fileName)
 
 		// First check whether the file is open - don't allow it to be deleted if it is, because that may corrupt the file system
 		FIL file;
-		const FRESULT openReturn = f_open(&file, location.c_str(), FA_OPEN_EXISTING | FA_READ);
+		const FRESULT openReturn = f_open(&file, filePath, FA_OPEN_EXISTING | FA_READ);
 		if (openReturn == FR_OK)
 		{
 			for (const FileStore& fil : files)
@@ -373,13 +359,13 @@ bool MassStorage::Delete(const char* directory, const char* fileName)
 
 		if (!isOpen)
 		{
-			unlinkReturn = f_unlink(location.c_str());
+			unlinkReturn = f_unlink(filePath);
 		}
 	}
 
 	if (isOpen)
 	{
-		reprap.GetPlatform().MessageF(ErrorMessage, "Cannot delete file %s because it is open\n", location.c_str());
+		reprap.GetPlatform().MessageF(ErrorMessage, "Cannot delete file %s because it is open\n", filePath);
 		return false;
 	}
 
@@ -388,7 +374,7 @@ bool MassStorage::Delete(const char* directory, const char* fileName)
 		// If the error was that the file or path doesn't exist, don't generate a global error message, but still return false
 		if (unlinkReturn != FR_NO_FILE && unlinkReturn != FR_NO_PATH)
 		{
-			reprap.GetPlatform().MessageF(ErrorMessage, "Failed to delete file %s\n", location.c_str());
+			reprap.GetPlatform().MessageF(ErrorMessage, "Failed to delete file %s\n", filePath);
 		}
 		return false;
 	}
@@ -437,17 +423,10 @@ bool MassStorage::Rename(const char *oldFilename, const char *newFilename)
 }
 
 // Check if the specified file exists
-bool MassStorage::FileExists(const char *file) const
+bool MassStorage::FileExists(const char *filePath) const
 {
 	FILINFO fil;
-	return (f_stat(file, &fil) == FR_OK);
-}
-
-bool MassStorage::FileExists(const char *directory, const char *fileName) const
-{
-	String<MaxFilenameLength> location;
-	CombineName(location.GetRef(), directory, fileName);
-	return FileExists(location.c_str());
+	return (f_stat(filePath, &fil) == FR_OK);
 }
 
 // Check if the specified directory exists
@@ -485,38 +464,27 @@ bool MassStorage::DirectoryExists(const char *path) const
 	return DirectoryExists(loc.GetRef());
 }
 
-bool MassStorage::DirectoryExists(const char* directory, const char* subDirectory)
-{
-	String<MaxFilenameLength> location;
-	CombineName(location.GetRef(), directory, subDirectory);
-	return DirectoryExists(location.GetRef());
-}
-
 // Return the last modified time of a file, or zero if failure
-time_t MassStorage::GetLastModifiedTime(const char* directory, const char *fileName) const
+time_t MassStorage::GetLastModifiedTime(const char *filePath) const
 {
-	String<MaxFilenameLength> location;
-	CombineName(location.GetRef(), directory, fileName);
 	FILINFO fil;
-	if (f_stat(location.c_str(), &fil) == FR_OK)
+	if (f_stat(filePath, &fil) == FR_OK)
 	{
 		return ConvertTimeStamp(fil.fdate, fil.ftime);
 	}
 	return 0;
 }
 
-bool MassStorage::SetLastModifiedTime(const char* directory, const char *fileName, time_t time)
+bool MassStorage::SetLastModifiedTime(const char *filePath, time_t time)
 {
-	String<MaxFilenameLength> location;
-	CombineName(location.GetRef(), directory, fileName);
 	const struct tm * const timeInfo = gmtime(&time);
 	FILINFO fno;
     fno.fdate = (WORD)(((timeInfo->tm_year - 80) * 512U) | (timeInfo->tm_mon + 1) * 32U | timeInfo->tm_mday);
     fno.ftime = (WORD)(timeInfo->tm_hour * 2048U | timeInfo->tm_min * 32U | timeInfo->tm_sec / 2U);
-    const bool ok = (f_utime(location.c_str(), &fno) == FR_OK);
+    const bool ok = (f_utime(filePath, &fno) == FR_OK);
     if (!ok)
 	{
-		reprap.GetPlatform().MessageF(ErrorMessage, "Failed to set last modified time for file '%s'\n", location.c_str());
+		reprap.GetPlatform().MessageF(ErrorMessage, "Failed to set last modified time for file '%s'\n", filePath);
 	}
     return ok;
 }
@@ -806,16 +774,16 @@ void MassStorage::Spin()
 	}
 }
 
-bool MassStorage::GetFileInfo(const char *directory, const char *fileName, GCodeFileInfo& info, bool quitEarly)
+bool MassStorage::GetFileInfo(const char *filePath, GCodeFileInfo& info, bool quitEarly)
 {
 #if SUPPORT_RPI_USB_DRIVE
-	if (strncmp(fileName, "2:", 2) == 0)
+	if (strncmp(filePath, "2:", 2) == 0)
 	{
 		char rsp[MaxFilenameLength];
 
 		StreamGCodeInput* serialInput = reprap.GetGCodes().serialInput;
 		serialInput->Reset(); // reset serial input buffer
-		reprap.GetPlatform().MessageF(UsbMessage, "M36 \"%s\"\n", fileName);
+		reprap.GetPlatform().MessageF(UsbMessage, "M36 \"%s\"\n", filePath);
 
 		info.Init();
 
@@ -838,14 +806,13 @@ bool MassStorage::GetFileInfo(const char *directory, const char *fileName, GCode
 	}
 #endif
 
-	return infoParser.GetFileInfo(directory, fileName, info, quitEarly);
+	return infoParser.GetFileInfo(filePath, info, quitEarly);
 }
 
 // Append the simulated printing time to the end of the file
-void MassStorage::RecordSimulationTime(const char *printingFilename, uint32_t simSeconds)
+void MassStorage::RecordSimulationTime(const char *printingFilePath, uint32_t simSeconds)
 {
-	const char * const GCodeDir = reprap.GetPlatform().GetGCodeDir();
-	FileStore * const file = OpenFile(GCodeDir, printingFilename, OpenMode::append, 0);
+	FileStore * const file = OpenFile(printingFilePath, OpenMode::append, 0);
 	bool ok = (file != nullptr);
 	if (ok)
 	{
@@ -861,7 +828,7 @@ void MassStorage::RecordSimulationTime(const char *printingFilename, uint32_t si
 			ok = (file->Read(buffer.GetRef().Pointer(), bytesToRead) == (int)bytesToRead);
 			if (ok)
 			{
-				lastModtime = GetLastModifiedTime(GCodeDir, printingFilename);	// save the last modified time to that we can restore it later
+				lastModtime = GetLastModifiedTime(printingFilePath);			// save the last modified time to that we can restore it later
 				buffer[bytesToRead] = 0;										// this is OK because String<N> has N+1 bytes of storage
 				const char* const pos = strstr(buffer.c_str(), FileInfoParser::SimulatedTimeString);
 				if (pos != nullptr)
@@ -885,13 +852,13 @@ void MassStorage::RecordSimulationTime(const char *printingFilename, uint32_t si
 		}
 		if (ok && lastModtime != 0)
 		{
-			ok = SetLastModifiedTime(GCodeDir, printingFilename, lastModtime);
+			ok = SetLastModifiedTime(printingFilePath, lastModtime);
 		}
 	}
 
 	if (!ok)
 	{
-		reprap.GetPlatform().MessageF(ErrorMessage, "Failed to append simulated print time to file %s\n", printingFilename);
+		reprap.GetPlatform().MessageF(ErrorMessage, "Failed to append simulated print time to file %s\n", printingFilePath);
 	}
 }
 
