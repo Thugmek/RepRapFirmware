@@ -1847,7 +1847,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			return false;
 		}
 
-		UnlockMovement(gb);									// allow babystepping and pausing while heating
+		UnlockAll(gb);									// allow babystepping and pausing while heating
 		{
 			// Check if the heater index is passed
 			const uint32_t index = gb.Seen('P') ? gb.GetUIValue() : 0;
