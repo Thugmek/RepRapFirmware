@@ -2366,8 +2366,8 @@ void Platform::Diagnostics(MessageType mtype)
 
 #ifdef I2C_IFACE
 	const TwoWire::ErrorCounts errs = I2C_IFACE.GetErrorCounts(true);
-	MessageF(mtype, "I2C nak errors %" PRIu32 ", send timeouts %" PRIu32 ", receive timeouts %" PRIu32 ", finishTimeouts %" PRIu32 ", resets %" PRIu32 "\n",
-		errs.naks, errs.sendTimeouts, errs.recvTimeouts, errs.finishTimeouts, errs.resets);
+	MessageF(mtype, "I2C nak errors %" PRIu32 ", send timeouts %" PRIu32 ", receive timeouts %" PRIu32 ", finishTimeouts %" PRIu32 "\n",
+		errs.naks, errs.sendTimeouts, errs.recvTimeouts, errs.finishTimeouts);
 #endif
 }
 
