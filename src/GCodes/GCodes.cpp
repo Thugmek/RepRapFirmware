@@ -763,6 +763,17 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 		}
 		break;
 
+	case GCodeState::waitingForPalette2:
+		if (LockMovementAndWaitForStandstill(gb))
+		{
+			gb.AdvanceState();
+			if (AllAxesAreHomed())
+			{
+				// DoFileMacro(gb, PALETTE2_G, true);
+			}
+		}
+		break;
+
 	case GCodeState::pausing1:
 		if (LockMovementAndWaitForStandstill(gb))
 		{
@@ -1924,7 +1935,16 @@ void GCodes::DoPause(GCodeBuffer& gb, PauseReason reason, const char *msg)
 		SaveResumeInfo(false);															// create the resume file so that we can resume after power down
 	}
 
-	gb.SetState((reason == PauseReason::filamentChange) ? GCodeState::filamentChangePause1 : GCodeState::pausing1);
+	switch (reason) {
+		case PauseReason::filamentChange:
+			gb.SetState(GCodeState::filamentChangePause1);
+			break;
+		case PauseReason::palette2:
+			gb.SetState(GCodeState::waitingForPalette2);
+			break;
+		default :
+			gb.SetState(GCodeState::pausing1);
+	}
 	isPaused = true;
 
 	if (msg != nullptr)
@@ -1943,6 +1963,7 @@ bool GCodes::IsPausing() const
 	GCodeState topState = fileGCode->OriginalMachineState().state;
 	if (   topState == GCodeState::pausing1 || topState == GCodeState::pausing2
 		|| topState == GCodeState::filamentChangePause1 || topState == GCodeState::filamentChangePause2
+		|| topState == GCodeState::waitingForPalette2
 	   )
 	{
 		return true;
@@ -1951,6 +1972,7 @@ bool GCodes::IsPausing() const
 	topState = daemonGCode->OriginalMachineState().state;
 	if (   topState == GCodeState::pausing1 || topState == GCodeState::pausing2
 		|| topState == GCodeState::filamentChangePause1 || topState == GCodeState::filamentChangePause2
+		|| topState == GCodeState::waitingForPalette2
 	   )
 	{
 		return true;
@@ -1962,6 +1984,7 @@ bool GCodes::IsPausing() const
 #if HAS_VOLTAGE_MONITOR
 		|| topState == GCodeState::powerFailPausing1
 #endif
+		|| topState == GCodeState::waitingForPalette2
 	   )
 	{
 		return true;
@@ -2222,11 +2245,6 @@ void GCodes::SaveResumeInfo(bool wasPowerFailure)
 			}
 			if (ok)
 			{
-				buf.printf("M98 P\"%s\"\n", RESUME_PROLOGUE_G);				// call the prologue
-				ok = f->Write(buf.c_str());
-			}
-			if (ok)
-			{
 				buf.copy("M116\nM290");
 				for (size_t axis = 0; axis < numVisibleAxes; ++axis)
 				{
@@ -2284,6 +2302,11 @@ void GCodes::SaveResumeInfo(bool wasPowerFailure)
 			if (ok)
 			{
 				ok = reprap.WriteToolSettings(f);							// set tool temperatures, tool mix ratios etc.
+			}
+			if (ok)
+			{
+				buf.printf("M98 P\"%s\"\n", RESUME_PROLOGUE_G);				// call the prologue
+				ok = f->Write(buf.c_str());
 			}
 			if (ok)
 			{
@@ -3686,6 +3709,8 @@ void GCodes::StartPrinting(bool fromStart)
 		// Get the fileGCode to execute the start macro so that any M82/M83 codes will be executed in the correct context
 		DoFileMacro(*fileGCode, START_G, false);
 	}
+
+	platform.DeleteSysFile(RESUME_AFTER_POWER_FAIL_G);
 }
 
 // Function to handle dwell delays. Returns true for dwell finished, false otherwise.

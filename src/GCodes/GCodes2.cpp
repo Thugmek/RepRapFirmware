@@ -423,7 +423,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			{
 				ForwardToUsb(gb, false); // no source info
 
-				DoPause(gb, PauseReason::user, nullptr);
+				DoPause(gb, PauseReason::palette2, nullptr);
 				result = GCodeResult::ok;
 			}
 		}

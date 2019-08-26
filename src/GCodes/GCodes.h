@@ -92,8 +92,9 @@ enum class PauseReason
 	stall,			// motor stall detected
 #endif
 #if HAS_VOLTAGE_MONITOR
-	lowVoltage		// VIN voltage dropped below configured minimum
+	lowVoltage,		// VIN voltage dropped below configured minimum
 #endif
+	palette2
 };
 
 enum class StopPrintReason

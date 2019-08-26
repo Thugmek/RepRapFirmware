@@ -87,6 +87,8 @@ enum class GCodeState : uint8_t
 
 	timingSDwrite,
 
+	waitingForPalette2,
+
 #if HAS_VOLTAGE_MONITOR
 	powerFailPausing1
 #endif
