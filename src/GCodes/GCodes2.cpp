@@ -4319,11 +4319,11 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			auxInput->ReadLine(rsp, sizeof(rsp) - 1);
 			if (strcmp(rsp, "OK") == 0)
 			{
-				platform.SendAuxMessage("AT+ADDR\r\n", true);
+				platform.SendAuxMessage("AT+LADDR\r\n", true);
 				auxInput->ReadLine(rsp, sizeof(rsp) - 1);
 
-				strcpy(rsp2, "Bluetooth MAC: ");
-				strcat(rsp2, rsp+6); // from response +ADDR=00:15:87:20:FF:46 copy only MAC
+				strcpy(rsp2, "BT module MAC: ");
+				strcat(rsp2, rsp+7); // from response +LADDR=00:15:87:20:FF:46 copy only MAC
 
 				reply.copy(rsp2);
 				result = GCodeResult::ok;
