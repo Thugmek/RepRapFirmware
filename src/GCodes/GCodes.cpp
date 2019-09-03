@@ -3324,7 +3324,22 @@ void GCodes::EmergencyStop()
 // 0 = running a system macro automatically
 bool GCodes::DoFileMacro(GCodeBuffer& gb, const char* fileName, bool reportMissing, int codeRunning)
 {
-	FileStore * const f = platform.OpenSysFile(fileName, OpenMode::read);
+	String<StringLength20> toolSpecFileName;
+
+	const Tool * const tool = reprap.GetCurrentTool();
+	FileStore * f = nullptr;
+
+	if (tool != nullptr) // Check tool selected
+	{
+		toolSpecFileName.printf("T%d_%s", tool->Number(), fileName); // Add tool number before file name
+		f = platform.OpenSysFile(toolSpecFileName.c_str(), OpenMode::read);	// Open tool specific file
+	}
+
+	if (f == nullptr) // If tool specific file doesnt exist, open original file
+	{
+		f = platform.OpenSysFile(fileName, OpenMode::read);
+	}
+
 	if (f == nullptr)
 	{
 		if (reportMissing)
