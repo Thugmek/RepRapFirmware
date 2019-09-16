@@ -155,6 +155,13 @@ public:
 
 	void SuspendHeaters(bool sus);								// Suspend the heaters to conserve power
 
+	void SetSafetyTimer(uint32_t timeout);
+	void ResetSafetyTimer();
+	bool CheckSafetyTimer();
+	void StopSafetyTimer();
+
+	void SetLastActiveTemperature(int8_t heater, float t);
+	float GetLastActiveTemperature(int8_t heater);
 private:
 	Heat(const Heat&);											// Private copy constructor to prevent copying
 
@@ -185,6 +192,11 @@ private:
 	int8_t chamberHeaters[NumChamberHeaters];					// Indices of the chamber heaters to use or -1 if none is available
 	int8_t heaterBeingTuned;									// which PID is currently being tuned
 	int8_t lastHeaterTuned;										// which PID we last finished tuning
+
+	MillisTimer safetyTimer;
+	uint32_t safetyTimerTimeout = 1800000;						// Default 30min = 30x60x1000
+
+	float lastActiveTemperature[NumBedHeaters];
 };
 
 //***********************************************************************************************************

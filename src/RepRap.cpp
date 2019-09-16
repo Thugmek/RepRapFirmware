@@ -444,6 +444,21 @@ void RepRap::Spin()
 		}
 	}
 
+	if (now - lastCheckSafetyTimer >= 100)
+	{
+		char status = GetStatusCharacter();
+		if (status == 'B' or status == 'P' or status == 'S')
+		{
+			heat->ResetSafetyTimer();
+		}
+		else if (heat->CheckSafetyTimer())
+		{
+			platform->Message(WarningMessage, "Heating disabled by safety timer\n");
+		}
+
+		lastCheckSafetyTimer = now;
+	}
+
 	// Keep track of the loop time
 	if (justSentDiagnostics)
 	{

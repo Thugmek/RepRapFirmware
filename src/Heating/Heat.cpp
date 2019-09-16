@@ -348,6 +348,11 @@ void Heat::SetActiveTemperature(int8_t heater, float t)
 	if (heater >= 0 && heater < (int)NumHeaters)
 	{
 		pids[heater]->SetActiveTemperature(t);
+
+		if (t > 0) // If is not 0, then save for restore
+			SetLastActiveTemperature(heater, t);
+
+		ResetSafetyTimer();
 	}
 }
 
@@ -361,6 +366,8 @@ void Heat::SetStandbyTemperature(int8_t heater, float t)
 	if (heater >= 0 && heater < (int)NumHeaters)
 	{
 		pids[heater]->SetStandbyTemperature(t);
+
+		ResetSafetyTimer();
 	}
 }
 
@@ -429,6 +436,8 @@ void Heat::Activate(int8_t heater)
 	if (heater >= 0 && heater < (int)NumHeaters)
 	{
 		pids[heater]->Activate();
+
+		ResetSafetyTimer();
 	}
 }
 
@@ -450,6 +459,8 @@ void Heat::SwitchOffAll(bool includingChamberAndBed)
 			pids[heater]->SwitchOff();
 		}
 	}
+
+	StopSafetyTimer();
 }
 
 void Heat::Standby(int8_t heater, const Tool *tool)
@@ -458,6 +469,8 @@ void Heat::Standby(int8_t heater, const Tool *tool)
 	{
 		pids[heater]->Standby();
 		lastStandbyTools[heater] = tool;
+
+		ResetSafetyTimer();
 	}
 }
 
@@ -491,6 +504,8 @@ void Heat::StartAutoTune(size_t heater, float temperature, float maxPwm, const S
 	{
 		heaterBeingTuned = (int8_t)heater;
 		pids[heater]->StartAutoTune(temperature, maxPwm, reply);
+
+		StopSafetyTimer();
 	}
 	else
 	{
@@ -716,6 +731,11 @@ void Heat::SuspendHeaters(bool sus)
 	{
 		p->Suspend(sus);
 	}
+
+	if (sus)
+		StopSafetyTimer();
+	else
+		ResetSafetyTimer();
 }
 
 // Save some resume information returning true if successful.
@@ -741,6 +761,57 @@ bool Heat::WriteBedAndChamberTempSettings(FileStore *f) const
 		}
 	}
 	return (buf.strlen() == 0) || f->Write(buf.c_str());
+}
+
+void Heat::SetSafetyTimer(uint32_t timeout)
+{
+	safetyTimerTimeout = timeout;
+
+	ResetSafetyTimer();
+}
+
+void Heat::ResetSafetyTimer()
+{
+	if (safetyTimerTimeout > 0)
+		safetyTimer.Start();
+	else
+		safetyTimer.Stop();
+}
+
+bool Heat::CheckSafetyTimer()
+{
+	if (safetyTimerTimeout > 0)
+	{
+		if (safetyTimer.CheckAndStop(safetyTimerTimeout))
+		{
+			SwitchOffAll(true);
+
+			return true;
+		}
+		else
+			return false;
+	}
+	else
+	{
+		safetyTimer.Stop();
+
+		return false;
+	}
+}
+
+void Heat::StopSafetyTimer()
+{
+	safetyTimer.Stop();
+}
+
+void Heat::SetLastActiveTemperature(int8_t heater, float t)
+{
+	lastActiveTemperature[heater] = t;
+}
+
+float Heat::GetLastActiveTemperature(int8_t heater)
+{
+	return lastActiveTemperature[heater];
 }
 
 // End

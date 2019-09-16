@@ -1189,6 +1189,10 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		// For case 84, see case 18
 
 	case 85: // Set inactive time
+		if (gb.Seen('S'))
+		{
+			reprap.GetHeat().SetSafetyTimer(60000 * gb.GetUIValue());
+		}
 		break;
 
 	case 92: // Set/report steps/mm for some axes
@@ -1389,7 +1393,10 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			}
 			else
 			{
-				break;		// no target temperature given
+				if (reprap.GetCurrentTool() != nullptr)
+					temperature = reprap.GetHeat().GetLastActiveTemperature(reprap.GetCurrentTool()->Heater(0)); // Restore last temperature
+				else
+					break; // no target temperature given
 			}
 
 			// Find the tool that the command applies to.
@@ -1748,10 +1755,19 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			const char* const heaterName = (code == 141) ? "chamber" : "bed";
 
 			// Active temperature
+			float temperature = 0.0;
 			if (gb.Seen('S'))
 			{
+				temperature = gb.GetFValue();
 				seen = true;
-				const float temperature = gb.GetFValue();
+			}
+			else if (currentHeater >= 0)
+			{
+				temperature = reprap.GetHeat().GetLastActiveTemperature(currentHeater); // Restore last temperature
+				seen = true;
+			}
+			if (seen)
+			{
 				if (currentHeater < 0)
 				{
 					if (temperature > 0.0)		// turning off a non-existent bed or chamber heater is not an error
@@ -1875,7 +1891,8 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				}
 				else
 				{
-					break;		// no target temperature given
+					waitWhenCooling = false;
+					temperature = reprap.GetHeat().GetLastActiveTemperature(heater); // Restore last temperature
 				}
 
 				reprap.GetHeat().SetActiveTemperature(heater, temperature);

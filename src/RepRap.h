@@ -173,6 +173,8 @@ private:
 	Tool* currentTool;
 	uint32_t lastWarningMillis;					// When we last sent a warning message for things that can happen very often
 
+	uint32_t lastCheckSafetyTimer;
+
 	uint16_t activeExtruders;
 	uint16_t activeToolHeaters;
 
