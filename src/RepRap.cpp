@@ -453,7 +453,7 @@ void RepRap::Spin()
 		}
 		else if (heat->CheckSafetyTimer())
 		{
-			platform->Message(WarningMessage, "Heating disabled by safety timer\n");
+			platform->SendAlert(WarningMessage, "Heating disabled by safety timer", "Heating disabled", 1, 0.0, 0);
 		}
 
 		lastCheckSafetyTimer = now;

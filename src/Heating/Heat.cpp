@@ -784,7 +784,11 @@ bool Heat::CheckSafetyTimer()
 	{
 		if (safetyTimer.CheckAndStop(safetyTimerTimeout))
 		{
-			SwitchOffAll(true);
+			for (int heater = 0; heater < (int)NumHeaters; ++heater)
+			{
+				if (!IsChamberHeater(heater))
+					SetActiveTemperature(heater, 0.0);
+			}
 
 			return true;
 		}
