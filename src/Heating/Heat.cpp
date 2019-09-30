@@ -782,7 +782,7 @@ bool Heat::CheckSafetyTimer()
 {
 	if (safetyTimerTimeout > 0)
 	{
-		if (safetyTimer.CheckAndStop(safetyTimerTimeout))
+		if (safetyTimer.IsRunning() and safetyTimer.CheckAndStop(safetyTimerTimeout))
 		{
 			for (int heater = 0; heater < (int)NumHeaters; ++heater)
 			{

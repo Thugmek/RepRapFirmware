@@ -447,13 +447,13 @@ void RepRap::Spin()
 	if (now - lastCheckSafetyTimer >= 100)
 	{
 		char status = GetStatusCharacter();
-		if (status == 'B' or status == 'P' or status == 'S')
+		if (status == 'B' or status == 'P' or status == 'D' or status == 'R' or status == 'T')
 		{
 			heat->ResetSafetyTimer();
 		}
 		else if (heat->CheckSafetyTimer())
 		{
-			platform->SendAlert(WarningMessage, "Heating disabled by safety timer", "Heating disabled", 1, 0.0, 0);
+			platform->Message(WarningMessage, "Heating disabled by safety timer");
 		}
 
 		lastCheckSafetyTimer = now;
@@ -2125,18 +2125,22 @@ void RepRap::Beep(unsigned int freq, unsigned int ms)
 	ms = constrain<unsigned int>(ms, 10, 60000);
 
 	// If there is an LCD device present, make it beep
+	bool bleeped = false;
 #if SUPPORT_12864_LCD
 	if (display->IsPresent())
 	{
 		display->Beep(freq, ms);
+		bleeped = true;
 	}
-	else
 #endif
+
 	if (platform->HaveAux())
 	{
 		platform->Beep(freq, ms);
+		bleeped = true;
 	}
-	else
+
+	if (!bleeped)
 	{
 		beepFrequency = freq;
 		beepDuration = ms;
