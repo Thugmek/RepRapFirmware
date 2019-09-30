@@ -350,9 +350,11 @@ void Heat::SetActiveTemperature(int8_t heater, float t)
 		pids[heater]->SetActiveTemperature(t);
 
 		if (t > 0) // If is not 0, then save for restore
+		{
 			SetLastActiveTemperature(heater, t);
 
-		ResetSafetyTimer();
+			ResetSafetyTimer();
+		}
 	}
 }
 
@@ -367,7 +369,8 @@ void Heat::SetStandbyTemperature(int8_t heater, float t)
 	{
 		pids[heater]->SetStandbyTemperature(t);
 
-		ResetSafetyTimer();
+		if (t > 0)
+			ResetSafetyTimer();
 	}
 }
 
@@ -782,14 +785,13 @@ bool Heat::CheckSafetyTimer()
 {
 	if (safetyTimerTimeout > 0)
 	{
-		if (safetyTimer.IsRunning() and safetyTimer.CheckAndStop(safetyTimerTimeout))
+		if (safetyTimer.CheckAndStop(safetyTimerTimeout))
 		{
 			for (int heater = 0; heater < (int)NumHeaters; ++heater)
 			{
 				if (!IsChamberHeater(heater))
 					SetActiveTemperature(heater, 0.0);
 			}
-
 			return true;
 		}
 		else
