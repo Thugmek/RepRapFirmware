@@ -71,6 +71,8 @@ public:
 	bool CheckPassword(const char* pw) const;
 	void SetPassword(const char* pw);
 
+	char GetStatusCharacter() const;
+
 	void AddTool(Tool* t);
 	void DeleteTool(Tool* t);
 	void SelectTool(int toolNumber, bool simulating);
@@ -146,8 +148,6 @@ protected:
 private:
 	static void EncodeString(StringRef& response, const char* src, size_t spaceToLeave, bool allowControlChars = false, char prefix = 0);
 
-	char GetStatusCharacter() const;
-
 	static constexpr uint32_t MaxTicksInSpinState = 20000;	// timeout before we reset the processor
 	static constexpr uint32_t HighTicksInSpinState = 16000;	// how long before we warn that timeout is approaching
 
@@ -173,6 +173,7 @@ private:
 	Tool* currentTool;
 	uint32_t lastWarningMillis;					// When we last sent a warning message for things that can happen very often
 
+	uint32_t lastSendStatus;
 	uint32_t lastCheckSafetyTimer;
 
 	uint16_t activeExtruders;

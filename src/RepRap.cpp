@@ -444,19 +444,25 @@ void RepRap::Spin()
 		}
 	}
 
+	// Every 100ms check inactivity for safety timer
 	if (now - lastCheckSafetyTimer >= 100)
 	{
 		char status = GetStatusCharacter();
 		if (status == 'B' or status == 'P' or status == 'D' or status == 'R' or status == 'T')
-		{
 			heat->ResetSafetyTimer();
-		}
 		else if (heat->CheckSafetyTimer())
-		{
 			platform->Message(WarningMessage, "Heating disabled by safety timer");
-		}
 
 		lastCheckSafetyTimer = now;
+	}
+
+	// Every 250ms send status to RPi
+	if (now - lastSendStatus >= 250)
+	{
+		// Machine status
+		platform->MessageF(UsbMessage, "{\"status\":\"%c\"}\n", GetStatusCharacter());
+
+		lastSendStatus = now;
 	}
 
 	// Keep track of the loop time

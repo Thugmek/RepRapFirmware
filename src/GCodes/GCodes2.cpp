@@ -4251,6 +4251,12 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		{
 			result = GCodeResult::error;
 
+			if (reprap.GetStatusCharacter() != 'I')
+			{
+				reply.copy("Cannot set BT module when not Idle");
+				break;
+			}
+
 			if (gb.Seen('P'))
 			{
 				String<MachineNameLength> name;
@@ -4331,6 +4337,12 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 	case 781: // Get BT module mac address
 		{
 			result = GCodeResult::error;
+
+			if (reprap.GetStatusCharacter() != 'I')
+			{
+				reply.copy("Cannot get BT module MAC when not Idle");
+				break;
+			}
 
 			char rsp[40];
 			char rsp2[40];
