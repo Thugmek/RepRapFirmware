@@ -763,14 +763,23 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 		}
 		break;
 
-	case GCodeState::waitingForPalette2:
+	case GCodeState::waitingForPalette2_1:
 		if (LockMovementAndWaitForStandstill(gb))
 		{
 			gb.AdvanceState();
+
 			if (AllAxesAreHomed())
 			{
 				// DoFileMacro(gb, PALETTE2_G, true);
 			}
+		}
+		break;
+
+	case GCodeState::waitingForPalette2_2:
+		if (LockMovementAndWaitForStandstill(gb))
+		{
+			platform.MessageF(LogMessage, "%s\n", "Printing paused, please follow the instructions on Palette 2's screen");
+			gb.SetState(GCodeState::normal);
 		}
 		break;
 
@@ -1940,7 +1949,7 @@ void GCodes::DoPause(GCodeBuffer& gb, PauseReason reason, const char *msg)
 			gb.SetState(GCodeState::filamentChangePause1);
 			break;
 		case PauseReason::palette2:
-			gb.SetState(GCodeState::waitingForPalette2);
+			gb.SetState(GCodeState::waitingForPalette2_1);
 			break;
 		default :
 			gb.SetState(GCodeState::pausing1);
@@ -1963,7 +1972,7 @@ bool GCodes::IsPausing() const
 	GCodeState topState = fileGCode->OriginalMachineState().state;
 	if (   topState == GCodeState::pausing1 || topState == GCodeState::pausing2
 		|| topState == GCodeState::filamentChangePause1 || topState == GCodeState::filamentChangePause2
-		|| topState == GCodeState::waitingForPalette2
+		|| topState == GCodeState::waitingForPalette2_1 || topState == GCodeState::waitingForPalette2_2
 	   )
 	{
 		return true;
@@ -1972,7 +1981,7 @@ bool GCodes::IsPausing() const
 	topState = daemonGCode->OriginalMachineState().state;
 	if (   topState == GCodeState::pausing1 || topState == GCodeState::pausing2
 		|| topState == GCodeState::filamentChangePause1 || topState == GCodeState::filamentChangePause2
-		|| topState == GCodeState::waitingForPalette2
+		|| topState == GCodeState::waitingForPalette2_1 || topState == GCodeState::waitingForPalette2_2
 	   )
 	{
 		return true;
@@ -1984,7 +1993,7 @@ bool GCodes::IsPausing() const
 #if HAS_VOLTAGE_MONITOR
 		|| topState == GCodeState::powerFailPausing1
 #endif
-		|| topState == GCodeState::waitingForPalette2
+		|| topState == GCodeState::waitingForPalette2_1 || topState == GCodeState::waitingForPalette2_2
 	   )
 	{
 		return true;
@@ -5573,7 +5582,7 @@ GCodeResult GCodes::StartSDTiming(GCodeBuffer& gb, const StringRef& reply)
 	return GCodeResult::ok;
 }
 
-GCodeResult GCodes::ForwardToUsb(GCodeBuffer& gb, bool addSource)
+GCodeResult GCodes::ForwardToUsb(GCodeBuffer& gb, bool addSource, bool blocking)
 {
 	String<GCodeReplyLength> msg;
 
@@ -5604,7 +5613,20 @@ GCodeResult GCodes::ForwardToUsb(GCodeBuffer& gb, bool addSource)
 	}
 	msg.cat(gb.Buffer());
 
-	platform.MessageF(UsbMessage, "%s\n", msg.c_str());
+	platform.MessageF(blocking ? BlockingUsbMessage : UsbMessage, "%s\n", msg.c_str());
+
+	return GCodeResult::ok;
+}
+
+GCodeResult GCodes::ForwardToPalette2(const char *gcode)
+{
+	String<GCodeReplyLength> msg;
+
+	// Copy palette2 gcode
+	//strcpy(palette2gcode, gcode);
+	msg.cat(gcode);
+
+	platform.MessageF(BlockingUsbMessage, "%s\n", msg.c_str());
 
 	return GCodeResult::ok;
 }

@@ -110,27 +110,43 @@ bool GCodes::HandlePaletteCode(GCodeBuffer& gb, const StringRef& reply)
 	GCodeResult result = GCodeResult::ok;
 	OutputBuffer *outBuf = nullptr;
 
-	if ((strcmp(gb.Buffer(), "ok") == 0) or (strcmp(gb.Buffer(), "OK") == 0))
+	if (waitingForPalette2)
 	{
-		for (GCodeBuffer* targetGb : gcodeSources)
+		if (strcmp(gb.Buffer(), "ok") == 0)
 		{
-			if (targetGb != nullptr)
+			for (GCodeBuffer* targetGb : gcodeSources)
 			{
-				targetGb->MessageAcknowledged(false);
+				if (targetGb != nullptr)
+				{
+					targetGb->MessageAcknowledged(false);
+				}
 			}
+			waitingForPalette2 = false;
 		}
-	} else
+		else if (millis() - palette2SendGcodeTime > 30000) // resend gcode every 30s
+		{
+			ForwardToPalette2(palette2gcode); // Resend gcode
+
+			palette2SendGcodeTime = millis();
+		}
+	}
+	else
 	{
 		if (!LockMovementAndWaitForStandstill(gb))
 		{
 			return false;					// if it's a blocking message, wait for movement to stop before displaying it
 		}
 
-		ForwardToUsb(gb, false); // No source info
+		ForwardToPalette2(gb.Buffer());
 
-		Push(gb); // stack the machine state including the file position
-		gb.MachineState().fileState.Close();							// stop reading from file
-		gb.MachineState().waitingForAcknowledgement = true;				// flag that we are waiting for acknowledgement
+		waitingForPalette2 = true;
+		palette2SendGcodeTime = millis();
+
+		if (Push(gb)) // stack the machine state including the file position
+		{
+			gb.MachineState().fileState.Close();							// stop reading from file
+			gb.MachineState().waitingForAcknowledgement = true;				// flag that we are waiting for acknowledgement
+		}
 	}
 
 	return HandleResult(gb, result, reply, outBuf);

@@ -290,7 +290,8 @@ private:
 
 	void HandleReply(GCodeBuffer& gb, OutputBuffer *reply);
 
-	GCodeResult ForwardToUsb(GCodeBuffer& gb, bool addSource=true);
+	GCodeResult ForwardToUsb(GCodeBuffer& gb, bool addSource=true, bool blocking=true);
+	GCodeResult ForwardToPalette2(const char* gcode);
 
 	const char* DoStraightMove(GCodeBuffer& gb, bool isCoordinated) __attribute__((hot));	// Execute a straight move returning any error message
 	const char* DoArcMove(GCodeBuffer& gb, bool clockwise)						// Execute an arc move returning any error message
@@ -469,6 +470,10 @@ private:
 	bool filamentChangePausePending;			// true if we have been asked to pause for a filament change but we are running a macro
 	bool runningConfigFile;						// We are running config.g during the startup process
 	bool doingToolChange;						// We are running tool change macros
+
+	bool waitingForPalette2 = false;					// We are waiting for palette2 response
+	uint32_t palette2SendGcodeTime;
+	char palette2gcode[GCODE_LENGTH];
 
 #if HAS_VOLTAGE_MONITOR
 	bool isPowerFailPaused;						// true if the print was paused automatically because of a power failure

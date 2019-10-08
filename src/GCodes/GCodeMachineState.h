@@ -87,11 +87,11 @@ enum class GCodeState : uint8_t
 
 	timingSDwrite,
 
-	waitingForPalette2,
-
 #if HAS_VOLTAGE_MONITOR
-	powerFailPausing1
+	powerFailPausing1,
 #endif
+	waitingForPalette2_1,
+	waitingForPalette2_2
 };
 
 // Class to hold the state of gcode execution for some input source
