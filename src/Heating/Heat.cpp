@@ -60,6 +60,8 @@ Heat::Heat(Platform& p)
 	for (size_t heater : ARRAY_INDICES(pids))
 	{
 		pids[heater] = new PID(platform, heater);
+
+		lastActiveTemperature[heater] = 0.0;
 	}
 }
 

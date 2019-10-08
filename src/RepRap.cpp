@@ -460,7 +460,7 @@ void RepRap::Spin()
 	if (now - lastSendStatus >= 250)
 	{
 		// Machine status
-		platform->MessageF(UsbMessage, "{\"status\":\"%c\"}\n", GetStatusCharacter());
+		platform->MessageF(BlockingUsbMessage, "{\"status\":\"%c\"}\n", GetStatusCharacter());
 
 		lastSendStatus = now;
 	}

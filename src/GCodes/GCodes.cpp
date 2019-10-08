@@ -778,7 +778,7 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 	case GCodeState::waitingForPalette2_2:
 		if (LockMovementAndWaitForStandstill(gb))
 		{
-			platform.MessageF(LogMessage, "%s\n", "Printing paused, please follow the instructions on Palette 2's screen");
+			platform.MessageF(LoggedGenericMessage, "%s\n", "Printing paused, please follow the instructions on Palette 2's screen");
 			gb.SetState(GCodeState::normal);
 		}
 		break;
@@ -5620,13 +5620,7 @@ GCodeResult GCodes::ForwardToUsb(GCodeBuffer& gb, bool addSource, bool blocking)
 
 GCodeResult GCodes::ForwardToPalette2(const char *gcode)
 {
-	String<GCodeReplyLength> msg;
-
-	// Copy palette2 gcode
-	//strcpy(palette2gcode, gcode);
-	msg.cat(gcode);
-
-	platform.MessageF(BlockingUsbMessage, "%s\n", msg.c_str());
+	platform.MessageF(BlockingUsbMessage, "%s\n", gcode);
 
 	return GCodeResult::ok;
 }

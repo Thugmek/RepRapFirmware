@@ -81,10 +81,17 @@ bool GCodes::ActOnCode(GCodeBuffer& gb, const StringRef& reply)
 		break;
 
 	case 'T':
-		return HandleTcode(gb, reply);
+		{
+			return HandleTcode(gb, reply);
+		}
+		break;
 
 	case 'O':
-		return HandlePaletteCode(gb, reply);
+		if (gb.HasCommandNumber())
+		{
+			return HandlePaletteCode(gb, reply);
+		}
+		break;
 
 	default:
 		return HandleUnknownCode(gb, reply);
@@ -112,7 +119,10 @@ bool GCodes::HandlePaletteCode(GCodeBuffer& gb, const StringRef& reply)
 
 	if (waitingForPalette2)
 	{
-		if (strcmp(gb.Buffer(), "ok") == 0)
+		String<GCODE_LENGTH + 5> cmd;
+		cmd.printf("%s: ok", palette2LastOCode);
+
+		if (strcmp(gb.Buffer(), cmd.c_str()) == 0)
 		{
 			for (GCodeBuffer* targetGb : gcodeSources)
 			{
@@ -123,12 +133,12 @@ bool GCodes::HandlePaletteCode(GCodeBuffer& gb, const StringRef& reply)
 			}
 			waitingForPalette2 = false;
 		}
-		else if (millis() - palette2SendGcodeTime > 30000) // resend gcode every 30s
+		/* else if (millis() - palette2LastOCodeSendTime > 30000) // resend gcode every 30s
 		{
-			ForwardToPalette2(palette2gcode); // Resend gcode
+			ForwardToPalette2(palette2LastOCode); // Resend gcode
 
-			palette2SendGcodeTime = millis();
-		}
+			palette2LastOCodeSendTime = millis();
+		} */
 	}
 	else
 	{
@@ -139,8 +149,9 @@ bool GCodes::HandlePaletteCode(GCodeBuffer& gb, const StringRef& reply)
 
 		ForwardToPalette2(gb.Buffer());
 
+		strcpy(palette2LastOCode, gb.Buffer());
+		palette2LastOCodeSendTime = millis();
 		waitingForPalette2 = true;
-		palette2SendGcodeTime = millis();
 
 		if (Push(gb)) // stack the machine state including the file position
 		{

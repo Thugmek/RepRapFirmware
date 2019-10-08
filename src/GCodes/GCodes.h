@@ -472,8 +472,9 @@ private:
 	bool doingToolChange;						// We are running tool change macros
 
 	bool waitingForPalette2 = false;					// We are waiting for palette2 response
-	uint32_t palette2SendGcodeTime;
-	char palette2gcode[GCODE_LENGTH];
+	char palette2LastOCode[GCODE_LENGTH];
+	uint32_t palette2LastOCodeSendTime;
+
 
 #if HAS_VOLTAGE_MONITOR
 	bool isPowerFailPaused;						// true if the print was paused automatically because of a power failure
