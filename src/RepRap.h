@@ -175,6 +175,7 @@ private:
 
 	uint32_t lastSendStatus;
 	uint32_t lastCheckSafetyTimer;
+	uint32_t lastSendDiagnostics;
 
 	uint16_t activeExtruders;
 	uint16_t activeToolHeaters;

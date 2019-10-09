@@ -10,6 +10,8 @@
 #include "RepRap.h"
 #include <cstdarg>
 
+/*static*/ OutputBuffer * volatile OutputBuffer::AllOutputBuffers[OUTPUT_BUFFER_COUNT];
+
 /*static*/ OutputBuffer * volatile OutputBuffer::freeOutputBuffers = nullptr;		// Messages may also be sent by ISRs,
 /*static*/ volatile size_t OutputBuffer::usedOutputBuffers = 0;						// so make these volatile.
 /*static*/ volatile size_t OutputBuffer::maxUsedOutputBuffers = 0;
@@ -342,8 +344,30 @@ bool OutputBuffer::WriteToFile(FileData& f) const
 	for (size_t i = 0; i < OUTPUT_BUFFER_COUNT; i++)
 	{
 		freeOutputBuffers = new OutputBuffer(freeOutputBuffers);
+
+		AllOutputBuffers[i] = freeOutputBuffers;
 	}
 }
+
+/*static*/ void OutputBuffer::Reset()
+{
+	usedOutputBuffers = 0;
+	maxUsedOutputBuffers = 0;
+	freeOutputBuffers = nullptr;
+
+	for (size_t i = 0; i < OUTPUT_BUFFER_COUNT; i++)
+	{
+		OutputBuffer * buf = AllOutputBuffers[i];
+		buf->next = freeOutputBuffers;
+		buf->dataLength = buf->bytesRead = 0;
+		buf->references = 0;
+		buf->isReferenced = false;
+		buf->hadOverflow = false;
+
+		freeOutputBuffers = buf;
+	}
+}
+
 
 // Allocates an output buffer instance which can be used for (large) string outputs. This must be thread safe. Not safe to call from interrupts!
 /*static*/ bool OutputBuffer::Allocate(OutputBuffer *&buf)

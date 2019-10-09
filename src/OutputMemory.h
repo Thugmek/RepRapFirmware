@@ -71,6 +71,9 @@ class OutputBuffer
 		// Initialise the output buffers manager
 		static void Init();
 
+		// Reset output buffers
+		static void Reset();
+
 		// Allocate an unused OutputBuffer instance. Returns true on success or false if no instance could be allocated.
 		static bool Allocate(OutputBuffer *&buf);
 
@@ -105,6 +108,8 @@ class OutputBuffer
 		bool isReferenced;
 		bool hadOverflow;
 		volatile size_t references;
+
+		static OutputBuffer * volatile AllOutputBuffers[OUTPUT_BUFFER_COUNT]; // All buffers references
 
 		static OutputBuffer * volatile freeOutputBuffers;		// Messages may be sent by multiple tasks
 		static volatile size_t usedOutputBuffers;				// so make these volatile.

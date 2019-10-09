@@ -1374,6 +1374,14 @@ void Platform::Spin()
 	// Try to flush messages to serial ports
 	(void)FlushMessages();
 
+
+	if ((errorCodeBits & (uint32_t)ErrorCode::OutputStarvation) > 0)
+	{
+		OutputBuffer::Reset();
+
+		LogError(ErrorCode::None);
+	}
+
 	// Check the MCU max and min temperatures
 #if HAS_CPU_TEMP_SENSOR
 	if (adcFilters[CpuTempFilterIndex].IsValid())

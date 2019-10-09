@@ -465,6 +465,14 @@ void RepRap::Spin()
 		lastSendStatus = now;
 	}
 
+	// Every 1m send diagnostic
+	if (now - lastSendDiagnostics >= 60000)
+	{
+		Diagnostics(BlockingUsbMessage);
+
+		lastSendDiagnostics = now;
+	}
+
 	// Keep track of the loop time
 	if (justSentDiagnostics)
 	{
