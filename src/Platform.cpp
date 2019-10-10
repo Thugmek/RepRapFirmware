@@ -1377,9 +1377,19 @@ void Platform::Spin()
 
 	if ((errorCodeBits & (uint32_t)ErrorCode::OutputStarvation) > 0)
 	{
+		MessageF(BlockingUsbMessage, "%s\n", "Error: OutputStarvation - reset OutputBuffers");
+
+#ifdef SERIAL_AUX_DEVICE
+		auxOutput.ReleaseAll();
+#endif
+#ifdef SERIAL_AUX2_DEVICE
+		aux2Output.ReleaseAll();
+#endif
+		usbOutput.ReleaseAll();
+
 		OutputBuffer::Reset();
 
-		LogError(ErrorCode::None);
+		errorCodeBits = (uint32_t)ErrorCode::None;
 	}
 
 	// Check the MCU max and min temperatures

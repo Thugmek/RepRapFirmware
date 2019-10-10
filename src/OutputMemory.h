@@ -74,6 +74,8 @@ class OutputBuffer
 		// Reset output buffers
 		static void Reset();
 
+		static void Test();
+
 		// Allocate an unused OutputBuffer instance. Returns true on success or false if no instance could be allocated.
 		static bool Allocate(OutputBuffer *&buf);
 

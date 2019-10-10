@@ -368,6 +368,12 @@ bool OutputBuffer::WriteToFile(FileData& f) const
 	}
 }
 
+/*static*/ void OutputBuffer::Test()
+{
+	freeOutputBuffers = nullptr;
+	usedOutputBuffers = 24;
+}
+
 
 // Allocates an output buffer instance which can be used for (large) string outputs. This must be thread safe. Not safe to call from interrupts!
 /*static*/ bool OutputBuffer::Allocate(OutputBuffer *&buf)

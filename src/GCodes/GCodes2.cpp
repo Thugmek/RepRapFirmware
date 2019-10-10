@@ -4640,6 +4640,23 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		}
 		break;
 
+	case 1998:
+		{
+			platform.MessageF(BlockingUsbMessage, "%s\n", "Test fill OutputBuffer");
+
+			OutputBuffer::Test();
+			reprap.GetPlatform().LogError(ErrorCode::OutputStarvation);
+		}
+		break;
+
+	case 1999:
+		{
+			platform.MessageF(BlockingUsbMessage, "%s\n", "Reseting OutputBuffers...");
+
+			OutputBuffer::Reset();
+		}
+		break;
+
 	default:
 		ForwardToUsb(gb);
 
