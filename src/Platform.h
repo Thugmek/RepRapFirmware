@@ -284,6 +284,7 @@ typedef AveragingFilter<Z_PROBE_AVERAGE_READINGS> ZProbeAveragingFilter;
 // Enumeration of error condition bits
 enum class ErrorCode : uint32_t
 {
+	None = 0,
 	BadTemp = 1u << 0,
 	BadMove = 1u << 1,
 	OutputStarvation = 1u << 2,

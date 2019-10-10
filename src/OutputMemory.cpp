@@ -10,6 +10,7 @@
 #include "RepRap.h"
 #include <cstdarg>
 
+/*static*/ OutputBuffer * volatile OutputBuffer::AllOutputBuffers[OUTPUT_BUFFER_COUNT];
 /*static*/ OutputBuffer * volatile OutputBuffer::freeOutputBuffers = nullptr;		// Messages may also be sent by ISRs,
 /*static*/ volatile size_t OutputBuffer::usedOutputBuffers = 0;						// so make these volatile.
 /*static*/ volatile size_t OutputBuffer::maxUsedOutputBuffers = 0;
@@ -342,6 +343,8 @@ bool OutputBuffer::WriteToFile(FileData& f) const
 	for (size_t i = 0; i < OUTPUT_BUFFER_COUNT; i++)
 	{
 		freeOutputBuffers = new OutputBuffer(freeOutputBuffers);
+
+        AllOutputBuffers[i] = freeOutputBuffers;
 	}
 }
 
@@ -375,6 +378,25 @@ bool OutputBuffer::WriteToFile(FileData& f) const
 
 	reprap.GetPlatform().LogError(ErrorCode::OutputStarvation);
 	return false;
+}
+
+/*static*/ void OutputBuffer::Reset()
+{
+	usedOutputBuffers = 0;
+	maxUsedOutputBuffers = 0;
+	freeOutputBuffers = nullptr;
+
+	for (size_t i = 0; i < OUTPUT_BUFFER_COUNT; i++)
+	{
+		OutputBuffer * buf = AllOutputBuffers[i];
+		buf->next = freeOutputBuffers;
+		buf->dataLength = buf->bytesRead = 0;
+		buf->references = 0;
+		buf->isReferenced = false;
+		buf->hadOverflow = false;
+
+		freeOutputBuffers = buf;
+	}
 }
 
 // Get the number of bytes left for continuous writing
