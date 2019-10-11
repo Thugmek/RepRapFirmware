@@ -351,6 +351,8 @@ bool OutputBuffer::WriteToFile(FileData& f) const
 
 /*static*/ void OutputBuffer::Reset()
 {
+	TaskCriticalSectionLocker lock;
+
 	usedOutputBuffers = 0;
 	maxUsedOutputBuffers = 0;
 	freeOutputBuffers = nullptr;
@@ -366,12 +368,6 @@ bool OutputBuffer::WriteToFile(FileData& f) const
 
 		freeOutputBuffers = buf;
 	}
-}
-
-/*static*/ void OutputBuffer::Test()
-{
-	freeOutputBuffers = nullptr;
-	usedOutputBuffers = 24;
 }
 
 
@@ -465,6 +461,11 @@ bool OutputBuffer::WriteToFile(FileData& f) const
 {
 	TaskCriticalSectionLocker lock;
 	OutputBuffer * const nextBuffer = buf->next;
+
+	if (buf->references <= 0) // Was reset...
+	{
+		return nullptr;
+	}
 
 	// If this one is reused by another piece of code, don't free it up
 	if (buf->references > 1)
