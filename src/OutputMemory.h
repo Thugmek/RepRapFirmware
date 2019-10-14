@@ -105,6 +105,7 @@ class OutputBuffer
 		char data[OUTPUT_BUFFER_SIZE];
 		size_t dataLength, bytesRead;
 
+		bool used;
 		bool isReferenced;
 		bool hadOverflow;
 		volatile size_t references;

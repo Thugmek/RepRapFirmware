@@ -1208,6 +1208,19 @@ void Platform::Exit()
 
 }
 
+void Platform::ResetOutputStacks()
+{
+#ifdef SERIAL_AUX_DEVICE
+	auxOutput.ReleaseAll();
+#endif
+#ifdef SERIAL_AUX2_DEVICE
+	aux2Output.ReleaseAll();
+#endif
+	usbOutput.ReleaseAll();
+
+    errorCodeBits = (uint32_t)ErrorCode::None;
+}
+
 Compatibility Platform::Emulating() const
 {
 	return (compatibility == Compatibility::reprapFirmware) ? Compatibility::me : compatibility;
@@ -1373,24 +1386,6 @@ void Platform::Spin()
 
 	// Try to flush messages to serial ports
 	(void)FlushMessages();
-
-
-	if ((errorCodeBits & (uint32_t)ErrorCode::OutputStarvation) > 0)
-	{
-		MessageF(BlockingUsbMessage, "%s\n", "Error: OutputStarvation - reset OutputBuffers");
-
-#ifdef SERIAL_AUX_DEVICE
-		auxOutput.ReleaseAll();
-#endif
-#ifdef SERIAL_AUX2_DEVICE
-		aux2Output.ReleaseAll();
-#endif
-		usbOutput.ReleaseAll();
-
-		OutputBuffer::Reset();
-
-		errorCodeBits = (uint32_t)ErrorCode::None;
-	}
 
 	// Check the MCU max and min temperatures
 #if HAS_CPU_TEMP_SENSOR

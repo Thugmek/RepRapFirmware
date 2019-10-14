@@ -473,6 +473,23 @@ void RepRap::Spin()
 		lastSendDiagnostics = now;
 	}
 
+	// !!! TEMPORARY FIX OUT OF BUFFERS !!!
+	if (OutputBuffer::GetFreeBuffers() <= 0)
+	{
+		String<SsidBufferLength> tmp1; // Only for EnableInterface
+		String<GCodeReplyLength> tmp2; // Only for EnableInterface
+
+		platform->MessageF(BlockingUsbMessage, "%s\n", "Warning: Reset OutputBuffers");
+
+		network->EnableInterface(0, 0, tmp1.GetRef(), tmp2.GetRef()); // Stop networking
+
+		platform->ResetOutputStacks(); // Reset output stacks
+
+		OutputBuffer::Reset(); // Reset output buffers
+
+		network->EnableInterface(0, 1, tmp1.GetRef(), tmp2.GetRef()); // Start networking
+	}
+
 	// Keep track of the loop time
 	if (justSentDiagnostics)
 	{

@@ -365,6 +365,7 @@ bool OutputBuffer::WriteToFile(FileData& f) const
 		buf->references = 0;
 		buf->isReferenced = false;
 		buf->hadOverflow = false;
+		buf->used = false;
 
 		freeOutputBuffers = buf;
 	}
@@ -394,6 +395,7 @@ bool OutputBuffer::WriteToFile(FileData& f) const
 			buf->references = 1;					// assume it's only used once by default
 			buf->isReferenced = false;
 			buf->hadOverflow = false;
+			buf->used = true;
 
 			return true;
 		}
@@ -462,7 +464,7 @@ bool OutputBuffer::WriteToFile(FileData& f) const
 	TaskCriticalSectionLocker lock;
 	OutputBuffer * const nextBuffer = buf->next;
 
-	if (buf->references <= 0) // Was reset...
+	if (not buf->used) // Was reset...
 	{
 		return nullptr;
 	}

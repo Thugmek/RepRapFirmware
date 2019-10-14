@@ -4642,9 +4642,10 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 
 	case 1999:
 		{
-			platform.MessageF(BlockingUsbMessage, "%s\n", "Reseting OutputBuffers...");
+			platform.MessageF(BlockingUsbMessage, "%s\n", "Test filling OutputBuffer");
 
-			OutputBuffer::Reset();
+			OutputBuffer *outBuf = nullptr;
+			while(OutputBuffer::Allocate(outBuf));
 		}
 		break;
 
