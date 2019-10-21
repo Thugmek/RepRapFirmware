@@ -466,13 +466,16 @@ void RepRap::Spin()
 	}
 
 	// Every 1m send diagnostic
+	/*
 	if (now - lastSendDiagnostics >= 60000)
 	{
-		Diagnostics(BlockingUsbMessage);
+		OutputBuffer::Diagnostics(BlockingUsbMessage);
 
 		lastSendDiagnostics = now;
 	}
+	*/
 
+	/*
 	// !!! TEMPORARY FIX OUT OF BUFFERS !!!
 	if (OutputBuffer::GetFreeBuffers() <= 0)
 	{
@@ -489,6 +492,7 @@ void RepRap::Spin()
 
 		network->EnableInterface(0, 1, tmp1.GetRef(), tmp2.GetRef()); // Start networking
 	}
+	*/
 
 	// Keep track of the loop time
 	if (justSentDiagnostics)
@@ -1549,7 +1553,7 @@ OutputBuffer *RepRap::GetStatusResponse(uint8_t type, ResponseSource source)
 	if (source == ResponseSource::AUX)
 	{
 		OutputBuffer *reply = platform->GetAuxGCodeReply();
-		if (response != nullptr)
+		if (reply != nullptr && response != nullptr)
 		{
 			// Send the response to the last command. Do this last
 			response->catf(",\"seq\":%" PRIu32 ",\"resp\":", platform->GetAuxSeq());	// send the response sequence number

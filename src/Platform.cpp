@@ -1286,6 +1286,16 @@ bool Platform::FlushAuxMessages()
 			auxOutput.SetFirstItem(auxOutputBuffer);
 		}
 	}
+
+	// FIX timeout flush auxGCodeReply buffer, when not connected mobile app
+	if (auxGCodeReply != nullptr)
+	{
+		if (auxGCodeReply->BytesLeft() == 0 || auxGCodeReply->GetAge() > AUX_TIMEOUT)
+		{
+			auxGCodeReply = OutputBuffer::Release(auxGCodeReply);
+		}
+	}
+
 	return auxOutput.GetFirstItem() != nullptr;
 #else
 	return false;
@@ -3583,7 +3593,7 @@ void Platform::AppendAuxReply(const char *msg, bool rawMessage)
 {
 #ifdef SERIAL_AUX_DEVICE
 	// Discard this response if either no aux device is attached or if the response is empty
-	if (msg[0] != 0 && HaveAux())
+	if (HaveAux() && msg[0] != 0 && msg[0] != '\n')
 	{
 		MutexLocker lock(auxMutex);
 		if (rawMessage)
@@ -3652,6 +3662,11 @@ void Platform::RawMessage(MessageType type, const char *message)
 	if ((type & LogMessage) != 0 && logger != nullptr)
 	{
 		logger->LogMessage(realTime, message);
+	}
+
+	if ((type & BluetoothMessage) != 0)
+	{
+		AppendAuxReply(message, message[0] == '{' || (type & RawMessageFlag) != 0);
 	}
 
 	// Send the message to the destinations

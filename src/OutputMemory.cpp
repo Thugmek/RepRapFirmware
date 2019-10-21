@@ -344,6 +344,7 @@ bool OutputBuffer::WriteToFile(FileData& f) const
 	for (size_t i = 0; i < OUTPUT_BUFFER_COUNT; i++)
 	{
 		freeOutputBuffers = new OutputBuffer(freeOutputBuffers);
+		freeOutputBuffers->used = false;
 
 		AllOutputBuffers[i] = freeOutputBuffers;
 	}
@@ -481,6 +482,8 @@ bool OutputBuffer::WriteToFile(FileData& f) const
 		buf->next = freeOutputBuffers;
 		freeOutputBuffers = buf;
 		usedOutputBuffers--;
+
+		buf->used = false;
 	}
 	return nextBuffer;
 }
@@ -497,6 +500,21 @@ bool OutputBuffer::WriteToFile(FileData& f) const
 {
 	reprap.GetPlatform().MessageF(mtype, "Used output buffers: %d of %d (%d max)\n",
 			usedOutputBuffers, OUTPUT_BUFFER_COUNT, maxUsedOutputBuffers);
+
+	OutputBuffer *buf = nullptr;
+	for (size_t i = 0; i < OUTPUT_BUFFER_COUNT; i++)
+	{
+		buf = OutputBuffer::AllOutputBuffers[i];
+		if(buf->used)
+		{
+			reprap.GetPlatform().MessageF(mtype, "OutputBuffer %d\n", i);
+			reprap.GetPlatform().MessageF(mtype, "References %d\n", buf->references);
+			reprap.GetPlatform().MessageF(mtype, "Data %s\n", buf->data);
+			reprap.GetPlatform().MessageF(mtype, "DataLength %d\n", buf->dataLength);
+			reprap.GetPlatform().MessageF(mtype, "BytesRead %d\n", buf->bytesRead);
+			reprap.GetPlatform().MessageF(mtype, "WhenQueued %lu\n", buf->whenQueued);
+		}
+	}
 }
 
 //*************************************************************************************************

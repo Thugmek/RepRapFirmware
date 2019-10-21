@@ -1685,10 +1685,10 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 					type = TelnetMessage;
 					break;
 				case 99:    // BT Message
-					type = LcdMessage;
+					type = BluetoothMessage;
 					break;
 				default:
-					reply.printf("Invalid message type: %d", type);
+					reply.printf("Invalid message type: %lu", type);
 					result = GCodeResult::error;
 					break;
 				}
@@ -1700,6 +1700,9 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				{
 					String<GCODE_LENGTH> message;
 					gb.GetQuotedString(message.GetRef());
+
+					if (type == BluetoothMessage)
+						message.cat('\n');
 
 					platform.Message(type, message.c_str());
 				}
@@ -4340,16 +4343,23 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 
 							auxInput->ReadLine(rsp, sizeof(rsp) - 1);
 							auxInput->ReadLine(rsp, sizeof(rsp) - 1);
-							if (strcmp(rsp, "OK") == 0)
+							/*if (strcmp(rsp, "OK") == 0)
+							{
+								reply.copy("Setup BT module done");
 								result = GCodeResult::ok;
+							}
 							else
-								reply.copy("Reset fault");
+								reply.copy("Reset BT module fault");
+							*/
+							gb.PrintCommand(reply);
+							reply.cat(": ");
+							reply.cat("Setup BT module done");
+							result = GCodeResult::ok;
 						}
-						else
-							reply.copy("Setup name fault");
 					}
-					else
-						reply.copy("Setup baudrate fault");
+
+					if(result != GCodeResult::ok)
+						reply.copy("Setup BT module fault");
 				}
 				else
 					reply.copy("BT module not detected");
@@ -4385,7 +4395,9 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				strcpy(rsp2, "BT module MAC: ");
 				strcat(rsp2, rsp+7); // from response +LADDR=00:15:87:20:FF:46 copy only MAC
 
-				reply.copy(rsp2);
+				gb.PrintCommand(reply);
+				reply.cat(": ");
+				reply.cat(rsp2);
 				result = GCodeResult::ok;
 			}
 			else
@@ -4637,6 +4649,12 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 									? (uint16_t)SoftwareResetReason::erase
 									: (uint16_t)SoftwareResetReason::user;
 			platform.SoftwareReset(reason);			// doesn't return
+		}
+		break;
+
+	case 1998:
+		{
+			OutputBuffer::Diagnostics(BlockingUsbMessage);
 		}
 		break;
 
