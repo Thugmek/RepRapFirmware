@@ -303,6 +303,14 @@ void RepRap::Init()
 			{
 				platform->Message(UsbMessage, "Error, not found\n");
 			}
+
+			if (!platform->SysFileExists(RESUME_AFTER_POWER_FAIL_FILE)) // Not restore after power lost
+			{
+				if (platform->DirectoryExists(USB_DIR)) // USB directory exists
+				{
+					platform->DeleteDirectory(USB_DIR); // Remove USB directory
+				}
+			}
 		}
 		else
 		{

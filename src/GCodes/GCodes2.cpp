@@ -4652,21 +4652,6 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		}
 		break;
 
-	case 1998:
-		{
-			OutputBuffer::Diagnostics(BlockingUsbMessage);
-		}
-		break;
-
-	case 1999:
-		{
-			platform.MessageF(BlockingUsbMessage, "%s\n", "Test filling OutputBuffer");
-
-			OutputBuffer *outBuf = nullptr;
-			while(OutputBuffer::Allocate(outBuf));
-		}
-		break;
-
 	default:
 		ForwardToUsb(gb);
 

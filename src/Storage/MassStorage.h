@@ -34,6 +34,7 @@ public:
 	bool FindNext(FileInfo &file_info);
 	void AbandonFindNext();
 	bool Delete(const char* filePath);
+	bool DeleteDirectory(const char* directory);
 	bool MakeDirectory(const char *parentDir, const char *dirName);
 	bool MakeDirectory(const char *directory);
 	bool Rename(const char *oldFilePath, const char *newFilePath);

@@ -450,9 +450,9 @@ void PID::SetActiveTemperature(float t)
 	else
 	{
 		activeTemperature = t;
-		if (mode > HeaterMode::suspended && active)
+		if (mode > HeaterMode::fault)
 		{
-			SwitchOn();
+			Activate();
 		}
 	}
 }

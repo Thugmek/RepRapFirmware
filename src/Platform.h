@@ -375,9 +375,10 @@ public:
 	// File functions
 	MassStorage* GetMassStorage() const;
 	FileStore* OpenFile(const char* folder, const char* fileName, OpenMode mode, uint32_t preAllocSize = 0) const;
-	bool Delete(const char* folder, const char *filename) const;
-	bool FileExists(const char* folder, const char *filename) const;
-	bool DirectoryExists(const char *folder, const char *dir) const;
+	bool Delete(const char* folder, const char *filename = nullptr) const;
+	bool DeleteDirectory(const char* folder, const char *dir = nullptr) const;
+	bool FileExists(const char* folder, const char *filename = nullptr) const;
+	bool DirectoryExists(const char *folder, const char *dir = nullptr) const;
 
 	const char* GetWebDir() const; 					// Where the html etc files are
 	const char* GetGCodeDir() const; 				// Where the gcodes are

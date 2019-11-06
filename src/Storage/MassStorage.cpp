@@ -337,6 +337,8 @@ bool MassStorage::Delete(const char* filePath)
 	FRESULT unlinkReturn;
 	bool isOpen = false;
 
+
+
 	// Start new scope to lock the filesystem for the minimum time
 	{
 		MutexLocker lock(fsMutex);
@@ -379,6 +381,27 @@ bool MassStorage::Delete(const char* filePath)
 		return false;
 	}
 	return true;
+}
+
+// Delete directory
+bool MassStorage::DeleteDirectory(const char* directory)
+{
+	bool result = true;
+	String<MaxFilenameLength> location;
+
+	FileInfo fileInfo;
+	if (FindFirst(directory, fileInfo)) // delete content
+	{
+		// iterate through all entries
+		do {
+			CombineName(location.GetRef(), directory, fileInfo.fileName.c_str());
+			result &= Delete(location.c_str());
+
+		} while (FindNext(fileInfo));
+	}
+	result &= Delete(directory); // delete dir
+
+	return result;
 }
 
 // Create a new directory

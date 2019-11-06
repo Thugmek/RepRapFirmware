@@ -4258,21 +4258,44 @@ FileStore* Platform::OpenFile(const char* folder, const char* fileName, OpenMode
 bool Platform::Delete(const char* folder, const char *filename) const
 {
 	String<MaxFilenameLength> location;
-	MassStorage::CombineName(location.GetRef(), folder, filename);
+	if (filename == nullptr)
+		location.copy(folder);
+	else
+		MassStorage::CombineName(location.GetRef(), folder, filename);
+
 	return massStorage->Delete(location.c_str());
+}
+
+bool Platform::DeleteDirectory(const char* folder, const char *dir) const
+{
+	String<MaxFilenameLength> location;
+	if (dir == nullptr)
+		location.copy(folder);
+	else
+		MassStorage::CombineName(location.GetRef(), folder, dir);
+
+	return massStorage->DeleteDirectory(location.c_str());
 }
 
 bool Platform::FileExists(const char* folder, const char *filename) const
 {
 	String<MaxFilenameLength> location;
-	MassStorage::CombineName(location.GetRef(), folder, filename);
+	if (filename == nullptr)
+		location.copy(folder);
+	else
+		MassStorage::CombineName(location.GetRef(), folder, filename);
+
 	return massStorage->FileExists(location.c_str());
 }
 
 bool Platform::DirectoryExists(const char *folder, const char *dir) const
 {
 	String<MaxFilenameLength> location;
-	MassStorage::CombineName(location.GetRef(), folder, dir);
+	if (dir == nullptr)
+		location.copy(folder);
+	else
+		MassStorage::CombineName(location.GetRef(), folder, dir);
+
 	return massStorage->DirectoryExists(location.c_str());
 }
 
