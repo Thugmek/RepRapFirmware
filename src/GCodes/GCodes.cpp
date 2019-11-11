@@ -1835,7 +1835,7 @@ void GCodes::CheckFilament()
 	{
 		String<MediumStringLength> filamentErrorString;
 		filamentErrorString.printf("Extruder %u reports %s", lastFilamentErrorExtruder, FilamentMonitor::GetErrorMessage(lastFilamentError));
-		DoPause(*autoPauseGCode, PauseReason::filament, filamentErrorString.c_str());
+		DoPause(*autoPauseGCode, PauseReason::filamentChange, filamentErrorString.c_str());
 		lastFilamentError = FilamentSensorStatus::ok;
 		platform.Message(LogMessage, filamentErrorString.c_str());
 	}
