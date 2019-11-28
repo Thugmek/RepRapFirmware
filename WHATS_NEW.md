@@ -1,8 +1,27 @@
 Summary of important changes in recent versions
 ===============================================
 
+Version 2.05 (in preparation)
+============
+Compatible files:
+- DuetWiFiServer 1.23
+- DuetWebControl 2.0.4 (recommended) or 1.22.6
+
+Upgrade notes: none
+
+Changed behaviour:
+- Current position is no longer shown for pulse-type filament monitors, because it was meaningless and nearly always zero
+- Calibration data for pulse-type filament monitors is no longer displayed by M122 (same as for laser and magnetic filament monitors). Use M591 to report the calibration data.
+
+Bug fixes:
+- If a print that was sliced using absolute extrusion mode was resurrected, unwanted extrusion occurred just before the print was resumed
+- Bed compensation did not take account of the XY offset of the printing nozzle from the head reference point
+- When using SCARA kinematics the calculation of the minimum achoievable radius was incorrect. Depending on the B parameter of the M667 command, this could result in spurious "Intermediate position unreachable" errors, or non-extruding G1 moves being turned into G0 moves.
+- A badly-formed GCode file that returned the layer height or object height as nan or inf caused DWC to disconnect because of a JSON parse failure
+- M579 scale factors were not applied correctly to G2 and G3 arc moves
+
 Version 2.04
-===============
+============
 Compatible files:
 - DuetWiFiServer 1.23
 - DuetWebControl 2.0.4 (recommended) or 1.22.6
@@ -11,6 +30,9 @@ Upgrade notes:
 - If using this release to control a laser cutter/engraver, see the notes below on changed handling of the G1 S parameter
 - If you are using a simple microswitch as a filament monitor, you may need to add a pullup resistor (see below)
 - The P parameter of the G29 S0 (or plain G29) command has been withdrawn. See below under "changed behaviour".
+
+Known issues:
+- (present in older releases too) Resurrecting a print causes excessive extrusion at the start if the print was sliced using absolute extrusion. Workaround: slice prints using relative extrusion. If you need to resurrect a print that has been sliced using absolute extrusion, then edit the resurrect.g file to move the G92 E command later in the file, after the M23 and M26 commands.
 
 Feature improvements/changed behaviour:
 - File uploads are now done to temporary files that are renamed when the upload succeeds; so that if an upload fails, an original file with the same name is not lost (thanks wilriker)
