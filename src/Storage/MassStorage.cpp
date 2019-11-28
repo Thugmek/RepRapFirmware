@@ -196,7 +196,7 @@ bool MassStorage::FindFirst(const char *directory, FileInfo &file_info)
 
 		StreamGCodeInput* serialInput = reprap.GetGCodes().serialInput;
 		serialInput->Reset(); // reset serial input buffer
-		reprap.GetPlatform().MessageF(UsbMessage, "M20 P\"%s\"\n", directory);
+		reprap.GetPlatform().MessageF(BlockingUsbMessage, "M20 P\"%s\"\n", directory);
 
 		serialInput->ReadLine(rsp, sizeof(rsp) - 1);
 		//F:file name, D:directory name, E=End
@@ -806,7 +806,7 @@ bool MassStorage::GetFileInfo(const char *filePath, GCodeFileInfo& info, bool qu
 
 		StreamGCodeInput* serialInput = reprap.GetGCodes().serialInput;
 		serialInput->Reset(); // reset serial input buffer
-		reprap.GetPlatform().MessageF(UsbMessage, "M36 \"%s\"\n", filePath);
+		reprap.GetPlatform().MessageF(BlockingUsbMessage, "M36 \"%s\"\n", filePath);
 
 		info.Init();
 
