@@ -70,6 +70,7 @@ void GCodes::RawMove::SetDefaults(size_t firstDriveToZero)
 	isCoordinated = false;
 	usingStandardFeedrate = false;
 	usePressureAdvance = false;
+	hasExtrusion = false;
 	endStopsToCheck = 0;
 	filePos = noFilePosition;
 	xAxes = DefaultXAxisMapping;
@@ -560,14 +561,10 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 			{
 				if (gb.Seen(axisLetters[axis]))
 				{
-					for (size_t axs = 0; axs < numVisibleAxes; ++axs)
-					{
-						moveBuffer.coords[axs] = currentUserPosition[axs];
-					}
-					// Add R to the current position
-					moveBuffer.coords[axis] += rVal;
-
 					SetMoveBufferDefaults();
+					ToolOffsetTransform(currentUserPosition, moveBuffer.coords);
+					moveBuffer.coords[axis] += rVal;					// add R to the current position
+
 					moveBuffer.feedRate = findCenterOfCavityRestorePoint.feedRate;
 					moveBuffer.canPauseAfter = false;
 					moveBuffer.hasExtrusion = false;
@@ -597,19 +594,17 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 			{
 				if (gb.Seen(axisLetters[axis]))
 				{
-					for (size_t axs = 0; axs < numVisibleAxes; ++axs)
-					{
-						moveBuffer.coords[axs] = findCenterOfCavityRestorePoint.moveCoords[axs];
-					}
-					moveBuffer.coords[axis] += (currentUserPosition[axis] - findCenterOfCavityRestorePoint.moveCoords[axis]) / 2;
+					// Get the current position of the axis to calculate center-point below
+					float currentCoords[MaxTotalDrivers];
+					ToolOffsetTransform(currentUserPosition, currentCoords);
 
 					SetMoveBufferDefaults();
-					moveBuffer.feedRate = findCenterOfCavityRestorePoint.feedRate;
-					moveBuffer.hasExtrusion = false;
+					RestorePosition(findCenterOfCavityRestorePoint, &gb);
+					ToolOffsetTransform(currentUserPosition, moveBuffer.coords);
+					moveBuffer.coords[axis] += (currentCoords[axis] - moveBuffer.coords[axis]) / 2;
 
-					gb.SetState(GCodeState::waitingForSpecialMoveToComplete);
 					NewMoveAvailable(1);
-
+					gb.SetState(GCodeState::waitingForSpecialMoveToComplete);
 					break;
 				}
 			}
@@ -1284,7 +1279,7 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 				SetMoveBufferDefaults();
 				moveBuffer.endStopsToCheck = ZProbeActive;
 				moveBuffer.coords[Z_AXIS] = (IsAxisHomed(Z_AXIS))
-											? -platform.GetZProbeDiveHeight()			// Z axis has been homed, so no point in going very far
+											? platform.AxisMinimum(Z_AXIS) - platform.GetZProbeDiveHeight() + platform.GetZProbeStopHeight()	// Z axis has been homed, so no point in going very far
 											: -1.1 * platform.AxisTotalLength(Z_AXIS);	// Z axis not homed yet, so treat this as a homing move
 				moveBuffer.feedRate = platform.GetCurrentZProbeParameters().probeSpeed;
 				NewMoveAvailable(1);
@@ -2222,8 +2217,7 @@ void GCodes::SaveResumeInfo(bool wasPowerFailure)
 		}
 		else
 		{
-			String<FormatStringLength> bufferSpace;
-			const StringRef buf = bufferSpace.GetRef();
+			String<FormatStringLength> buf;
 
 			// Write the header comment
 			buf.printf("; File \"%s\" resume print after %s", printingFilename, (wasPowerFailure) ? "power failure" : "print paused");
@@ -2254,13 +2248,31 @@ void GCodes::SaveResumeInfo(bool wasPowerFailure)
 			}
 			if (ok)
 			{
-				buf.copy("M116\nM290");
+				ok = reprap.WriteToolSettings(f);							// set tool temperatures, tool mix ratios etc. and select the current tool without running tool change files
+			}
+			if (ok)
+			{
+				buf.printf("M98 P\"%s\"\n", RESUME_PROLOGUE_G);				// call the prologue
+				ok = f->Write(buf.c_str());
+			}
+			if (ok)
+			{
+				buf.copy("M116\nM290");										// wait for temperatures and start writing baby stepping offsets
+
 				for (size_t axis = 0; axis < numVisibleAxes; ++axis)
 				{
 					buf.catf(" %c%.3f", axisLetters[axis], (double)GetTotalBabyStepOffset(axis));
 				}
 				buf.cat(" R0\n");
 				ok = f->Write(buf.c_str());									// write baby stepping offsets
+			}
+
+			// Now that we have homed, we can run the tool change files for the current tool
+			const Tool * const ct = reprap.GetCurrentTool();
+			if (ok && ct != nullptr)
+			{
+				buf.printf("T-1 P0\nT%u P6\n", ct->Number());				// deselect the current tool without running tfree, and select it running tpre and tpost
+				ok = f->Write(buf.c_str());									// write tool selection
 			}
 
 #if SUPPORT_WORKPLACE_COORDINATES
@@ -2313,15 +2325,6 @@ void GCodes::SaveResumeInfo(bool wasPowerFailure)
 				}
 				buf.cat('\n');
 				ok = f->Write(buf.c_str());									// write volumetric extrusion factors
-			}
-			if (ok)
-			{
-				ok = reprap.WriteToolSettings(f);							// set tool temperatures, tool mix ratios etc.
-			}
-			if (ok)
-			{
-				buf.printf("M98 P\"%s\"\n", RESUME_PROLOGUE_G);				// call the prologue
-				ok = f->Write(buf.c_str());
 			}
 			if (ok)
 			{
@@ -2672,13 +2675,13 @@ const char* GCodes::DoStraightMove(GCodeBuffer& gb, bool isCoordinated)
 # if SUPPORT_LASER
 	else if (machineType == MachineType::laser)
 	{
-		if (!moveBuffer.isCoordinated || moveBuffer.moveType != 0)
-		{
-			moveBuffer.laserPwmOrIoBits.laserPwm = 0;
-		}
-		else if (gb.Seen('S'))
+		if (gb.Seen('S'))
 		{
 			moveBuffer.laserPwmOrIoBits.laserPwm = ConvertLaserPwm(gb.GetFValue());
+		}
+		else if (moveBuffer.moveType != 0)
+		{
+			moveBuffer.laserPwmOrIoBits.laserPwm = 0;
 		}
 		else if (laserPowerSticky)
 		{
@@ -5048,7 +5051,7 @@ GCodeResult GCodes::AdvanceHash(const StringRef &reply)
 			SHA1Result(&hash);
 			for(size_t i = 0; i < 5; i++)
 			{
-				reply.catf("%" PRIx32, hash.Message_Digest[i]);
+				reply.catf("%08" PRIx32, hash.Message_Digest[i]);
 			}
 
 			// Clean up again

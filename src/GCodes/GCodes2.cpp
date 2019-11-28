@@ -513,7 +513,13 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				break;
 
 			case MachineType::laser:
-				platform.SetLaserPwm(ConvertLaserPwm(gb.GetFValue()));
+				{
+					const Pwm_t laserPwm = ConvertLaserPwm(gb.GetFValue());
+					platform.SetLaserPwm(laserPwm);
+#if SUPPORT_LASER
+					moveBuffer.laserPwmOrIoBits.laserPwm = laserPwm;
+#endif
+				}
 				break;
 
 			default:
@@ -586,6 +592,9 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 
 		case MachineType::laser:
 			platform.SetLaserPwm(0);
+#if SUPPORT_LASER
+			moveBuffer.laserPwmOrIoBits.Clear();
+#endif
 			break;
 
 		default:
@@ -1532,11 +1541,21 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		break;
 
 	case 115: // Print firmware version or set hardware type
+#if defined(DUET_NG) || defined(DUET_06_085)
 		if (gb.Seen('P'))
 		{
-			platform.SetBoardType((BoardType)gb.GetIValue());
+			if (runningConfigFile)
+			{
+				platform.SetBoardType((BoardType)gb.GetIValue());
+			}
+			else
+			{
+				reply.copy("Board type can only be set within config.g");
+				result = GCodeResult::error;
+			}
 		}
 		else
+#endif
 		{
 			reply.printf("FIRMWARE_NAME: %s FIRMWARE_VERSION: %s ELECTRONICS: %s", FIRMWARE_NAME, VERSION, platform.GetElectronicsString());
 #ifdef DUET_NG
@@ -1705,6 +1724,10 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 						message.cat('\n');
 
 					platform.Message(type, message.c_str());
+					if (type != HttpMessage)
+					{
+						platform.Message(type, "\n");
+					}
 				}
 			}
 		}
@@ -2996,7 +3019,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			}
 			String<MaxFilenameLength> path;
 			gb.GetQuotedString(path.GetRef());
-			platform.SetSysDir(path.c_str());
+			result = platform.SetSysDir(path.c_str(), reply);
 		}
 		else
 		{

@@ -301,10 +301,6 @@ GCodeResult WiFiInterface::ReportProtocols(const StringRef& reply) const
 	reply.Clear();
 	for (size_t i = 0; i < NumProtocols; ++i)
 	{
-		if (i != 0)
-		{
-			reply.cat('\n');
-		}
 		ReportOneProtocol(i, reply);
 	}
 	return GCodeResult::ok;
@@ -314,11 +310,11 @@ void WiFiInterface::ReportOneProtocol(NetworkProtocol protocol, const StringRef&
 {
 	if (protocolEnabled[protocol])
 	{
-		reply.catf("%s is enabled on port %u", ProtocolNames[protocol], portNumbers[protocol]);
+		reply.lcatf("%s is enabled on port %u", ProtocolNames[protocol], portNumbers[protocol]);
 	}
 	else
 	{
-		reply.catf("%s is disabled", ProtocolNames[protocol]);
+		reply.lcatf("%s is disabled", ProtocolNames[protocol]);
 	}
 }
 
@@ -1539,10 +1535,10 @@ void WiFiInterface::SetupSpi()
 #endif
 
 	// Set up the SPI pins
-	ConfigurePin(g_APinDescription[APIN_ESP_SPI_SCK]);
-	ConfigurePin(g_APinDescription[APIN_ESP_SPI_MOSI]);
-	ConfigurePin(g_APinDescription[APIN_ESP_SPI_MISO]);
-	ConfigurePin(g_APinDescription[APIN_ESP_SPI_SS0]);
+	ConfigurePin(APIN_ESP_SPI_SCK);
+	ConfigurePin(APIN_ESP_SPI_MOSI);
+	ConfigurePin(APIN_ESP_SPI_MISO);
+	ConfigurePin(APIN_ESP_SPI_SS0);
 
 	pmc_enable_periph_clk(ESP_SPI_INTERFACE_ID);
 	spi_dma_disable();
