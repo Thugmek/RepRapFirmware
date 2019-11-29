@@ -412,6 +412,17 @@ bool GCodes::HandleGcode(GCodeBuffer& gb, const StringRef& reply)
 		result = SetPositions(gb);
 		break;
 
+	case 1031: // Return the probe value, or set probe variables
+		{
+			ZProbeType probeType = platform.GetZProbeType();
+			ZProbe params = platform.GetZProbeParameters(probeType);
+
+			reply.catf("X%.1f Y%.1f Z%.2f", (double)params.xOffset, (double)params.yOffset, (double)params.triggerHeight);
+
+		}
+		result = GCodeResult::ok;
+		break;
+
 	default:
 		// See if there is a file in /sys named Gxx.g
 		if (code >= 0 && code < 10000)
