@@ -131,6 +131,7 @@ public:
 
 	bool WriteToolSettings(FileStore *f) const;				// save some information for the resume file
 	bool WriteToolParameters(FileStore *f) const;			// save some information in config-override.g
+	bool WriteAxisStepsParameters(FileStore *f) const;
 
 	void ReportInternalError(const char *file, const char *func, int line) const;	// Report an internal error
 

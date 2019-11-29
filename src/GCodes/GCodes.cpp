@@ -5166,6 +5166,11 @@ GCodeResult GCodes::WriteConfigOverrideFile(GCodeBuffer& gb, const StringRef& re
 		ok = reprap.WriteToolParameters(f);
 	}
 
+	if (ok)
+	{
+		ok = reprap.WriteAxisStepsParameters(f);
+	}
+
 #if SUPPORT_WORKPLACE_COORDINATES
 	if (ok)
 	{

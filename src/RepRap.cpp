@@ -2415,6 +2415,33 @@ bool RepRap::WriteToolParameters(FileStore *f) const
 	return ok;
 }
 
+// Write axis steps per unit to config-override.g
+bool RepRap::WriteAxisStepsParameters(FileStore *f) const
+{
+	String<ScratchStringLength> scratchString;
+
+	scratchString.copy("M92 ");
+	const size_t numTotalAxes = gCodes->GetTotalAxes();
+	for (size_t axis = 0; axis < numTotalAxes; ++axis)
+	{
+		scratchString.catf("%c%d ", gCodes->GetAxisLetters()[axis], (int)platform->DriveStepsPerUnit(axis));
+	}
+
+	scratchString.catf("E");
+	const size_t numExtruders = gCodes->GetNumExtruders();
+	for (size_t extruder = 0; extruder < numExtruders; extruder++)
+	{
+		if (extruder > 0)
+			scratchString.cat(':');
+
+		scratchString.catf("%d", (int)platform->DriveStepsPerUnit(extruder + numTotalAxes));
+	}
+
+	scratchString.cat('\n');
+
+	return f->Write(scratchString.c_str());
+}
+
 // Helper function for diagnostic tests in Platform.cpp, to cause a deliberate divide-by-zero
 /*static*/ uint32_t RepRap::DoDivide(uint32_t a, uint32_t b)
 {
