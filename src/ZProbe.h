@@ -31,6 +31,7 @@ class ZProbe
 public:
 	float xOffset, yOffset;			// the offset of the probe relative to the print head
 	float triggerHeight;			// the nozzle height at which the target ADC value is returned
+	float currentTriggerHeight;		// current used nozzle height
 	float calibTemperature;			// the temperature at which we did the calibration
 	float temperatureCoefficient;	// the variation of height with bed temperature
 	float diveHeight;				// the dive height we use when probing

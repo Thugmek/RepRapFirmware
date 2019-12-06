@@ -93,6 +93,12 @@ GCodeResult GCodes::SetPrintZProbe(GCodeBuffer& gb, const StringRef& reply)
 		{
 			params.saveToConfigOverride = true;			// we are loading these parameters from config-override.g, so a subsequent M500 should save them to config-override.g
 		}
+
+		if (runningConfigFile or gb.MachineState().runningM501 or gb.MachineState().runningM502)
+		{
+			params.currentTriggerHeight = params.triggerHeight;
+		}
+
 		platform.SetZProbeParameters(probeType, params);
 	}
 	else

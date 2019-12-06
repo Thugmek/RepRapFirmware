@@ -1067,7 +1067,14 @@ OutputBuffer *RepRap::GetStatusResponse(uint8_t type, ResponseSource source)
 			ch = ',';
 		}
 		response->cat((ch == '[') ? "[]" : "]");
-		response->catf(",\"babystep\":%.3f}", (double)gCodes->GetTotalBabyStepOffset(Z_AXIS));
+		response->catf(",\"babystep\":%.3f", (double)gCodes->GetTotalBabyStepOffset(Z_AXIS));
+
+		{
+			ZProbeType probeType = platform->GetZProbeType();
+			ZProbe params = platform->GetZProbeParameters(probeType);
+
+			response->catf(",\"currentTriggerHeight\":%.2f}", (double)params.currentTriggerHeight);
+		}
 	}
 
 	// G-code reply sequence for webserver (sequence number for AUX is handled later)

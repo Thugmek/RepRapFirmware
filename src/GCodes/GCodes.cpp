@@ -655,6 +655,12 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 			else
 			{
 				toBeHomed &= ~axesHomed;
+
+				ZProbeType probeType = platform.GetZProbeType();
+				ZProbe params = platform.GetZProbeParameters(probeType);
+				params.currentTriggerHeight = params.triggerHeight; // Save current probe height
+				platform.SetZProbeParameters(probeType, params);
+
 				gb.SetState((toBeHomed == 0) ? GCodeState::normal : GCodeState::homing1);
 			}
 		}
@@ -5316,7 +5322,8 @@ void GCodes::CheckReportDue(GCodeBuffer& gb, const StringRef& reply) const
 				reply.cat('\n');
 				platform.Message(UsbMessage, reply.c_str());
 			}
-			if (lastAuxStatusReportType >= 0)
+			// Disable status report
+			if (false) // (lastAuxStatusReportType >= 0)
 			{
 				// Send a standard status response for PanelDue
 				OutputBuffer * const statusBuf = GenerateJsonStatusResponse(lastAuxStatusReportType, -1, ResponseSource::AUX);
