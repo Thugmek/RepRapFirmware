@@ -118,6 +118,7 @@ public:
 	uint16_t GetToolHeatersInUse() const;
 
 	OutputBuffer *GetStatusResponse(uint8_t type, ResponseSource source);
+	OutputBuffer *GetTrilabStatusResponse(uint8_t type, ResponseSource source);
 	OutputBuffer *GetConfigResponse();
 	OutputBuffer *GetLegacyStatusResponse(uint8_t type, int seq);
 	OutputBuffer *GetFilesResponse(const char* dir, unsigned int startAt, bool flagsDirs);
@@ -174,7 +175,7 @@ private:
 	Tool* currentTool;
 	uint32_t lastWarningMillis;					// When we last sent a warning message for things that can happen very often
 
-	uint32_t lastSendStatus;
+	//uint32_t lastSendStatus;
 	uint32_t lastCheckSafetyTimer;
 	uint32_t lastSendDiagnostics;
 

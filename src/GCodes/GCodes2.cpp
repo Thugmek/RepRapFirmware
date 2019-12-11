@@ -1732,7 +1732,6 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 
 					if (type == BluetoothMessage)
 						message.cat('\n');
-
 					platform.Message(type, message.c_str());
 					if (type != HttpMessage)
 					{
@@ -2501,6 +2500,10 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 					targetGb->MessageAcknowledged(cancelled);
 				}
 			}
+
+			String<GCODE_LENGTH> message;
+			message.printf("command: ack_message, data: %d\n", cancelled ? 1 : 0);
+			platform.Message(BluetoothMessage, message.c_str());
 		}
 		break;
 
@@ -4682,6 +4685,33 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 									? (uint16_t)SoftwareResetReason::erase
 									: (uint16_t)SoftwareResetReason::user;
 			platform.SoftwareReset(reason);			// doesn't return
+		}
+		break;
+
+	case 1408:
+		{
+			const int type = gb.Seen('S') ? gb.GetIValue() : 0;
+
+			switch (type)
+			{
+			case 0:
+				outBuf = reprap.GetTrilabStatusResponse(type, (&gb == auxGCode) ? ResponseSource::AUX : ResponseSource::Generic);
+				if (outBuf != nullptr)
+				{
+					outBuf->cat('\n');
+					if (outBuf->HadOverflow())
+					{
+						OutputBuffer::ReleaseAll(outBuf);
+					}
+				} else if (outBuf == nullptr)
+				{
+					result = GCodeResult::notFinished;			// we ran out of buffers, so try again later
+				}
+				break;
+			default:
+				result = ForwardToUsb(gb);
+				break;
+			}
 		}
 		break;
 

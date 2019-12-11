@@ -465,6 +465,7 @@ void RepRap::Spin()
 	}
 
 	// Every 250ms send status to RPi
+	/*
 	if (now - lastSendStatus >= 250)
 	{
 		// Machine status
@@ -472,6 +473,7 @@ void RepRap::Spin()
 
 		lastSendStatus = now;
 	}
+	*/
 
 	// Every 1m send diagnostic
 	/*
@@ -1563,6 +1565,42 @@ OutputBuffer *RepRap::GetStatusResponse(uint8_t type, ResponseSource source)
 			// Based on layers
 			response->catf(",\"layer\":%.1f}", (double)(printMonitor->EstimateTimeLeft(layerBased)));
 		}
+	}
+
+	if (source == ResponseSource::AUX)
+	{
+		OutputBuffer *reply = platform->GetAuxGCodeReply();
+		if (reply != nullptr && response != nullptr)
+		{
+			// Send the response to the last command. Do this last
+			response->catf(",\"seq\":%" PRIu32 ",\"resp\":", platform->GetAuxSeq());	// send the response sequence number
+
+			// Send the JSON response
+			response->EncodeReply(reply);												// also releases the OutputBuffer chain
+		}
+	}
+	response->cat('}');
+
+	return response;
+}
+
+OutputBuffer *RepRap::GetTrilabStatusResponse(uint8_t type, ResponseSource source)
+{
+	// Need something to write to...
+	OutputBuffer *response;
+	if (!OutputBuffer::Allocate(response))
+	{
+		return nullptr;
+	}
+
+	// Machine status
+	char ch = GetStatusCharacter();
+	response->printf("{\"status\":\"%c\"", ch);
+
+	// G-code reply sequence for webserver (sequence number for AUX is handled later)
+	if (source == ResponseSource::HTTP)
+	{
+		response->catf(",\"seq\":%" PRIu32, network->GetHttpReplySeq());
 	}
 
 	if (source == ResponseSource::AUX)
