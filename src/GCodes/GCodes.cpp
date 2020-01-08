@@ -5184,6 +5184,11 @@ GCodeResult GCodes::WriteConfigOverrideFile(GCodeBuffer& gb, const StringRef& re
 	}
 #endif
 
+	if (ok)
+	{
+		ok = WriteScaleCartesianFactor(f);
+	}
+
 	if (!f->Close())
 	{
 		ok = false;

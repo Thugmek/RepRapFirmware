@@ -330,6 +330,7 @@ private:
 	GCodeResult GetSetWorkplaceCoordinates(GCodeBuffer& gb, const StringRef& reply, bool compute);	// Set workspace coordinates
 	bool WriteWorkplaceCoordinates(FileStore *f) const;
 #endif
+	bool WriteScaleCartesianFactor(FileStore *f) const;
 
 	GCodeResult SetHeaterProtection(GCodeBuffer &gb, const StringRef &reply);	// Configure heater protection (M143)
 	void SetPidParameters(GCodeBuffer& gb, int heater, const StringRef& reply); // Set the P/I/D parameters for a heater

@@ -306,6 +306,22 @@ bool GCodes::WriteWorkplaceCoordinates(FileStore *f) const
 
 #endif
 
+bool GCodes::WriteScaleCartesianFactor(FileStore *f) const
+{
+	String<ScratchStringLength> scratchString;
+
+	scratchString.copy("; Scale cartesian factors\n");
+
+	scratchString.cat("M579");
+	for(size_t axis = 0; axis < numVisibleAxes; axis++)
+	{
+		scratchString.catf(" %c%.3f", axisLetters[axis], (double)axisScaleFactors[axis]);
+	}
+	scratchString.cat('\n');
+
+	return f->Write(scratchString.c_str());
+}
+
 // Define the probing grid, called when we see an M557 command
 GCodeResult GCodes::DefineGrid(GCodeBuffer& gb, const StringRef &reply)
 {
