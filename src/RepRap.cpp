@@ -2286,7 +2286,9 @@ char RepRap::GetStatusCharacter() const
 			: (printMonitor->IsPrinting() && gCodes->IsSimulating())	? 'M'	// Simulating
 			: (printMonitor->IsPrinting())							  	? 'P'	// Printing
 			: (gCodes->IsDoingToolChange())								? 'T'	// Changing tool
-			: (gCodes->DoingFileMacro() || !move->NoLiveMovement()) 	? 'B'	// Busy
+			: (gCodes->DoingFileMacro() ||
+					!move->NoLiveMovement() ||
+					gCodes->IsWaitingForTrilabControllerResponse()) 	? 'B'	// Busy
 			:															  'I';	// Idle
 }
 

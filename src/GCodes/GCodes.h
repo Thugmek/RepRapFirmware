@@ -193,6 +193,7 @@ public:
 	bool IsSimulating() const { return simulationMode != 0; }
 	bool IsDoingToolChange() const { return doingToolChange; }
 	bool IsHeatingUp() const;											// Return true if the SD card print is waiting for a heater to reach temperature
+	bool IsWaitingForTrilabControllerResponse() const { return waitingForTrilabControllerResponse; }
 
 	bool AllAxesAreHomed() const;										// Return true if all axes are homed
 
@@ -292,6 +293,9 @@ private:
 
 	GCodeResult ForwardToUsb(GCodeBuffer& gb, bool addSource=true, bool blocking=true);
 	GCodeResult ForwardToPalette2(const char* gcode);
+
+	GCodeResult SendTrilabControlerRequest(GCodeBuffer& gb, const int commandNumber, const char *params, bool waitForResponse=true);
+	bool HandleTrilabControllerResponse(GCodeBuffer& gb, const StringRef& reply);
 
 	const char* DoStraightMove(GCodeBuffer& gb, bool isCoordinated) __attribute__((hot));	// Execute a straight move returning any error message
 	const char* DoArcMove(GCodeBuffer& gb, bool clockwise)						// Execute an arc move returning any error message
@@ -472,10 +476,13 @@ private:
 	bool runningConfigFile;						// We are running config.g during the startup process
 	bool doingToolChange;						// We are running tool change macros
 
-	bool waitingForPalette2 = false;					// We are waiting for palette2 response
+	bool waitingForPalette2 = false;			// We are waiting for palette2 response
 	char palette2LastOCode[GCODE_LENGTH];
 	uint32_t palette2LastOCodeSendTime;
 
+	int trilabControllerRequestNumber;
+	uint32_t trilabControllerRequestSendTime;
+	bool waitingForTrilabControllerResponse = false;
 
 #if HAS_VOLTAGE_MONITOR
 	bool isPowerFailPaused;						// true if the print was paused automatically because of a power failure

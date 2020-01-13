@@ -661,7 +661,17 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 				params.currentTriggerHeight = params.triggerHeight; // Save current probe height
 				platform.SetZProbeParameters(probeType, params);
 
-				gb.SetState((toBeHomed == 0) ? GCodeState::normal : GCodeState::homing1);
+				if (toBeHomed == 0)
+				{
+					String<FormatStringLength> buf;
+					buf.printf("P%.3f", (double)params.currentTriggerHeight);
+
+					SendTrilabControlerRequest(gb, 100, buf.c_str(), true);
+				}
+				else
+				{
+					gb.SetState(GCodeState::homing1);
+				}
 			}
 		}
 		break;
@@ -1596,6 +1606,24 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 			}
 			timingBytesWritten += reply.Capacity();
 			writtenThisTime += reply.Capacity();
+		}
+		break;
+
+
+	case GCodeState::waitingForTrilabControllerResponse:
+		if (not waitingForTrilabControllerResponse)
+		{
+			gb.SetState(GCodeState::normal);
+		}
+		else if (millis() - trilabControllerRequestSendTime >= 5000)
+		{
+			AbortPrint(gb);
+
+			waitingForTrilabControllerResponse = false;
+
+			reply.copy("No response from Trilab controller");
+			error = true;
+			gb.SetState(GCodeState::normal);
 		}
 		break;
 
@@ -4837,9 +4865,11 @@ void GCodes::StopPrint(StopPrintReason reason)
 			platform.Message(UsbMessage, "Done printing file\n");
 		}
 		const uint32_t printMinutes = lrintf(reprap.GetPrintMonitor().GetPrintDuration()/60.0);
-		platform.MessageF(LoggedGenericMessage, "%s printing file %s, print time was %" PRIu32 "h %" PRIu32 "m\n",
-			(reason == StopPrintReason::normalCompletion) ? "Finished" : "Cancelled",
-			printingFilename, printMinutes/60u, printMinutes % 60u);
+
+		platform.MessageF(reason == StopPrintReason::abort ? ErrorMessage : LoggedGenericMessage, "%s printing file %s, print time was %" PRIu32 "h %" PRIu32 "m\n",
+				(reason == StopPrintReason::normalCompletion) ? "Finished" : "Cancelled",
+				printingFilename, printMinutes/60u, printMinutes % 60u);
+
 		if (reason == StopPrintReason::normalCompletion && simulationMode == 0)
 		{
 			platform.DeleteSysFile(RESUME_AFTER_POWER_FAIL_G);
@@ -5682,6 +5712,38 @@ GCodeResult GCodes::ForwardToPalette2(const char *gcode)
 
 	return GCodeResult::ok;
 }
+
+GCodeResult GCodes::SendTrilabControlerRequest(GCodeBuffer& gb, const int commandNumber, const char *params, bool waitForResponse)
+{
+	String<GCODE_LENGTH> buf;
+	buf.printf("C%d", commandNumber);
+
+	if (params != nullptr)
+	{
+		buf.catf(" %s", params);
+	}
+	buf.cat("\n");
+
+	platform.Message(BlockingUsbMessage, buf.c_str());
+
+	if (waitForResponse)
+	{
+		trilabControllerRequestNumber = commandNumber;
+		trilabControllerRequestSendTime = millis();
+		waitingForTrilabControllerResponse = true;
+
+		//if (Push(gb)) // stack the machine state including the file position
+		//{
+		//	gb.MachineState().fileState.Close();							// stop reading from file
+		//	gb.MachineState().waitingForAcknowledgement = true;				// flag that we are waiting for acknowledgement
+		//}
+
+		gb.SetState(GCodeState::waitingForTrilabControllerResponse);
+	}
+
+	return GCodeResult::ok;
+}
+
 
 #if SUPPORT_12864_LCD
 

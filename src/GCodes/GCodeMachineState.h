@@ -91,7 +91,9 @@ enum class GCodeState : uint8_t
 	powerFailPausing1,
 #endif
 	waitingForPalette2_1,
-	waitingForPalette2_2
+	waitingForPalette2_2,
+
+	waitingForTrilabControllerResponse,
 };
 
 // Class to hold the state of gcode execution for some input source

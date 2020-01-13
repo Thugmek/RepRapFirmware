@@ -295,7 +295,7 @@ void GCodeBuffer::DecodeCommand()
 	// Check for a valid command letter at the start
 	const char cl = toupper(gcodeBuffer[commandStart]);
 	commandFraction = -1;
-	if (cl == 'G' || cl == 'M' || cl == 'T' || cl == 'O')
+	if (cl == 'G' || cl == 'M' || cl == 'T' || cl == 'O' || cl == 'C')
 	{
 		commandLetter = cl;
 		hasCommandNumber = false;

@@ -93,6 +93,13 @@ bool GCodes::ActOnCode(GCodeBuffer& gb, const StringRef& reply)
 		}
 		break;
 
+	case 'C':
+		if (gb.HasCommandNumber())
+		{
+			return HandleTrilabControllerResponse(gb, reply);
+		}
+		break;
+
 	default:
 		return HandleUnknownCode(gb, reply);
 	}
@@ -158,6 +165,37 @@ bool GCodes::HandlePaletteCode(GCodeBuffer& gb, const StringRef& reply)
 			gb.MachineState().fileState.Close();							// stop reading from file
 			gb.MachineState().waitingForAcknowledgement = true;				// flag that we are waiting for acknowledgement
 		}
+	}
+
+	return HandleResult(gb, result, reply, outBuf);
+}
+
+bool GCodes::HandleTrilabControllerResponse(GCodeBuffer& gb, const StringRef& reply)
+{
+	GCodeResult result = GCodeResult::ok;
+	const int code = gb.GetCommandNumber();
+	OutputBuffer *outBuf = nullptr;
+
+	switch (code)
+	{
+	case 0: // Rapid move
+		break;
+
+	default:
+		break;
+	}
+
+	if (waitingForTrilabControllerResponse and (gb.GetCommandNumber() == trilabControllerRequestNumber))
+	{
+		//for (GCodeBuffer* targetGb : gcodeSources)
+		//{
+		//	if (targetGb != nullptr)
+		//	{
+		//		targetGb->MessageAcknowledged(false);
+		//	}
+		//}
+
+		waitingForTrilabControllerResponse = false;
 	}
 
 	return HandleResult(gb, result, reply, outBuf);
