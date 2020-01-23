@@ -80,6 +80,8 @@ class Heat;
 class PID;
 class TemperatureSensor;
 class Tool;
+class Head;
+class Pad;
 class Roland;
 class Scanner;
 class PrintMonitor;

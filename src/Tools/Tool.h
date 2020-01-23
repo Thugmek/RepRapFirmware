@@ -87,6 +87,9 @@ public:
 	void IterateExtruders(std::function<void(unsigned int)> f) const;
 	void IterateHeaters(std::function<void(int)> f) const;
 
+	Head *GetHead() const;
+	void SetHead(Head *h);
+
 	friend class RepRap;
 
 protected:
@@ -100,7 +103,7 @@ protected:
 private:
 	static Tool *freelist;
 
-	Tool() : next(nullptr), filament(nullptr), name(nullptr) { }
+	Tool() : next(nullptr), filament(nullptr), name(nullptr), head(nullptr) { }
 
 	void SetTemperatureFault(int8_t dudHeater);
 	void ResetTemperatureFault(int8_t wasDudHeater);
@@ -122,6 +125,7 @@ private:
 	FansBitmap fanMapping;
 	uint8_t drives[MaxExtrudersPerTool];
 	int8_t heaters[MaxHeatersPerTool];
+	Head* head;
 
 	ToolState state;
 	bool heaterFault;
@@ -166,6 +170,11 @@ inline size_t Tool::DriveCount() const
 inline float Tool::GetOffset(size_t axis) const
 {
 	return offset[axis];
+}
+
+inline void Tool::SetHead(Head *h)
+{
+	head = h;
 }
 
 #endif /* TOOL_H_ */
