@@ -3771,6 +3771,8 @@ void GCodes::StartPrinting(bool fromStart)
 
 	fileGCode->SetToolNumberAdjust(0);								// clear tool number adjustment
 
+	//SetAllAxesNotHomed();
+
 	// Reset all extruder positions when starting a new print
 	for (size_t extruder = 0; extruder < MaxExtruders; extruder++)
 	{
