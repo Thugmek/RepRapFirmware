@@ -41,6 +41,8 @@ public:
 	size_t ReadBytesUntil(char terminator, char *buffer, size_t length); // as readBytes with terminator character
 	size_t ReadLine(char *buffer, size_t length);
 
+	void setTimeout(unsigned long timeout);
+
 protected:
 	char ReadByte() override;
 

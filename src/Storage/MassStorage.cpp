@@ -200,7 +200,9 @@ bool MassStorage::FindFirst(const char *directory, FileInfo &file_info)
 		serialInput->Reset(); // reset serial input buffer
 		reprap.GetPlatform().MessageF(BlockingUsbMessage, "M20 P\"%s\"\n", directory);
 
+		serialInput->setTimeout(5000); // Timeout 5s
 		serialInput->ReadLine(rsp, sizeof(rsp) - 1);
+		serialInput->setTimeout(1000); // Revert timeout to default 1s
 		//F:file name, D:directory name, E=End
 		if (rsp[0] == 'E' || not (rsp[0] == 'F' || rsp[0] == 'D'))
 		{
@@ -267,10 +269,15 @@ bool MassStorage::FindNext(FileInfo &file_info)
 	{
 		char rsp[MaxFilenameLength];
 
-		reprap.GetGCodes().serialInput->ReadLine(rsp, sizeof(rsp) - 1);
+		StreamGCodeInput* serialInput = reprap.GetGCodes().serialInput;
+
+		serialInput->setTimeout(5000); // Timeout 5s
+		serialInput->ReadLine(rsp, sizeof(rsp) - 1);
+		serialInput->setTimeout(1000); // Revert timeout to default 1s
 		//F:file name, D:directory name, E=End
 		if (rsp[0] == 'E' || not (rsp[0] == 'F' || rsp[0] == 'D'))
 		{
+			serialInput->setTimeout(1000); // Revert default timeout 1s
 			findUsb = false;
 			return false;
 		}
@@ -820,7 +827,9 @@ bool MassStorage::GetFileInfo(const char *filePath, GCodeFileInfo& info, bool qu
 
 		info.Init();
 
+		serialInput->setTimeout(5000); // Timeout 5s
 		serialInput->ReadLine(rsp, sizeof(rsp) - 1);
+		serialInput->setTimeout(1000); // Revert timeout to default 1s
 		char * pch = strstr(rsp,"\"err\":");
 		if (pch != NULL) {
 			info.isValid = (SafeStrtoul(pch + 6) == 0); // "err":0
