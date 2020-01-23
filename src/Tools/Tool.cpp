@@ -543,4 +543,9 @@ bool Tool::UsesHeater(int8_t heater) const
 	return false;
 }
 
+Head *Tool::GetHead() const
+{
+	return head;
+}
+
 // End

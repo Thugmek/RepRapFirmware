@@ -75,6 +75,11 @@ size_t StreamGCodeInput::BytesCached() const
 	return device.available();
 }
 
+void StreamGCodeInput::setTimeout(unsigned long timeout)
+{
+	device.setTimeout(timeout);
+}
+
 // Dynamic G-code input class for caching codes from software-defined sources
 
 RegularGCodeInput::RegularGCodeInput()

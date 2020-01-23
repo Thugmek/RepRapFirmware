@@ -10,6 +10,8 @@
 #include "Scanner.h"
 #include "PrintMonitor.h"
 #include "Tools/Tool.h"
+#include "Tools/Head.h"
+#include "Tools/Pad.h"
 #include "Tools/Filament.h"
 #include "Tasks.h"
 #include "Version.h"
@@ -210,6 +212,8 @@ RepRap::RepRap() : toolList(nullptr), currentTool(nullptr), lastWarningMillis(0)
 void RepRap::Init()
 {
 	toolListMutex.Create("ToolList");
+	headListMutex.Create("HeadList");
+	padListMutex.Create("PadList");
 	messageBoxMutex.Create("MessageBox");
 
 	platform->Init();
@@ -831,6 +835,145 @@ unsigned int RepRap::GetNumberOfContiguousTools() const
 		++numTools;
 	}
 	return numTools;
+}
+
+void RepRap::AddHead(Head* head)
+{
+	MutexLocker lock(headListMutex);
+	Head** h = &headList;
+	while(*h != nullptr && (*h)->GetNumber() < head->GetNumber())
+	{
+		h = &((*h)->next);
+	}
+	head->next = *h;
+	*h = head;
+}
+
+void RepRap::DeleteHead(Head* head)
+{
+	// Must have a valid tool...
+	if (head == nullptr)
+	{
+		return;
+	}
+
+	// Purge any references to this tool
+	MutexLocker lock(headListMutex);
+	for (Head **h = &headList; *h != nullptr; h = &((*h)->next))
+	{
+		if (*h == head)
+		{
+			*h = head->next;
+			break;
+		}
+	}
+
+	// Delete it
+	Head::Delete(head);
+}
+
+Head* RepRap::GetHead(int headNumber) const
+{
+	MutexLocker lock(headListMutex);
+	Head* head = headList;
+	while(head != nullptr)
+	{
+		if (head->GetNumber() == headNumber)
+		{
+			return head;
+		}
+		head = head->Next();
+	}
+	return nullptr; // Not an error
+}
+
+void RepRap::SelectHead(int toolNumber, int headNumber)
+{
+	Tool* const tool = GetTool(toolNumber);
+	if (tool != nullptr)
+	{
+		Head* const head = GetHead(headNumber);
+		if (head != nullptr)
+		{
+			tool->SetHead(head);
+		}
+	}
+}
+
+void RepRap::PrintHead(int headNumber, const StringRef& reply) const
+{
+	const Head* const head = GetHead(headNumber);
+	if (head != nullptr)
+	{
+		head->Print(reply);
+	}
+	else
+	{
+		reply.copy("Error: Attempt to print details of non-existent head\n");
+	}
+}
+
+void RepRap::AddPad(Pad* pad)
+{
+	MutexLocker lock(padListMutex);
+	Pad** p = &padList;
+	while(*p != nullptr && (*p)->GetNumber() < pad->GetNumber())
+	{
+		p = &((*p)->next);
+	}
+	pad->next = *p;
+	*p = pad;
+}
+
+void RepRap::DeletePad(Pad* pad)
+{
+	// Must have a valid pad...
+	if (pad == nullptr)
+	{
+		return;
+	}
+
+	// Purge any references to this pad
+	MutexLocker lock(padListMutex);
+	for (Pad **p = &padList; *p != nullptr; p = &((*p)->next))
+	{
+		if (*p == pad)
+		{
+			*p = pad->next;
+			break;
+		}
+	}
+
+	// Delete it
+	Pad::Delete(pad);
+}
+
+Pad* RepRap::GetPad(int padNumber) const
+{
+	MutexLocker lock(padListMutex);
+	Pad* pad = padList;
+	while(pad != nullptr)
+	{
+		if (pad->GetNumber() == padNumber)
+		{
+			return pad;
+		}
+		pad = pad->Next();
+	}
+	return nullptr; // Not an error
+}
+
+void RepRap::PrintPad(int padNumber, const StringRef& reply) const
+{
+	const Pad* const pad = GetPad(padNumber);
+	if (pad != nullptr)
+	{
+		pad->Print(reply);
+	}
+	else
+	{
+		reply.copy("Error: Attempt to print details of non-existent pad\n");
+	}
 }
 
 void RepRap::Tick()
@@ -2487,6 +2630,34 @@ bool RepRap::WriteAxisStepsParameters(FileStore *f) const
 	scratchString.cat('\n');
 
 	return f->Write(scratchString.c_str());
+}
+
+bool RepRap::WriteHeadsSettings(FileStore *f) const
+{
+	// First write the settings of all tools except the current one and the command to select them if they are on standby
+	bool ok = f->Write("; Print Heads\n");
+
+	MutexLocker lock(headListMutex);
+	for (const Head *h = headList; h != nullptr && ok; h = h->Next())
+	{
+		ok = h->WriteSettings(f);
+	}
+
+	return ok;
+}
+
+bool RepRap::WritePadsSettings(FileStore *f) const
+{
+	// First write the settings of all tools except the current one and the command to select them if they are on standby
+	bool ok = f->Write("; Print Pads\n");
+
+	MutexLocker lock(padListMutex);
+	for (const Pad *p = padList; p != nullptr && ok; p = p->Next())
+	{
+		ok = p->WriteSettings(f);
+	}
+
+	return ok;
 }
 
 // Helper function for diagnostic tests in Platform.cpp, to cause a deliberate divide-by-zero

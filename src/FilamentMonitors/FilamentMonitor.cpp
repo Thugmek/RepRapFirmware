@@ -217,7 +217,8 @@ bool FilamentMonitor::ConfigurePin(GCodeBuffer& gb, const StringRef& reply, Inte
 			{
 				const float extrusionCommanded = (float)extruderStepsCommanded/reprap.GetPlatform().DriveStepsPerUnit(extruder + gCodes.GetTotalAxes());
 				const FilamentSensorStatus fstat = fs.Check(isPrinting, fromIsr, isrMillis, extrusionCommanded);
-				if (fstat != FilamentSensorStatus::ok)
+				int currentTool = reprap.GetCurrentToolNumber();
+				if (gCodes.AllAxesAreHomed() and currentTool >= 0 and extruder == (size_t)currentTool and fstat != FilamentSensorStatus::ok)
 				{
 					if (reprap.Debug(moduleFilamentSensors))
 					{

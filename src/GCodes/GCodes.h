@@ -341,6 +341,9 @@ private:
 	GCodeResult SetHeaterParameters(GCodeBuffer& gb, const StringRef& reply);	// Set the thermistor and ADC parameters for a heater
 	GCodeResult SetHeaterModel(GCodeBuffer& gb, const StringRef& reply);		// Set the heater model
 	GCodeResult ManageTool(GCodeBuffer& gb, const StringRef& reply);			// Create a new tool definition
+	GCodeResult ManageHead(GCodeBuffer& gb, const StringRef& reply);
+	GCodeResult ManagePad(GCodeBuffer& gb, const StringRef& reply);
+	GCodeResult SelectHeadAndPad(GCodeBuffer& gb, const StringRef& reply);
 	void SetToolHeaters(Tool *tool, float temperature, bool both);				// Set all a tool's heaters to the temperature, for M104/M109
 	bool ToolHeatersAtSetTemperatures(const Tool *tool, bool waitWhenCooling, float tolerance) const;
 																				// Wait for the heaters associated with the specified tool to reach their set temperatures
@@ -395,6 +398,8 @@ private:
 	GCodeResult ChangeSimulationMode(GCodeBuffer& gb, const StringRef &reply, uint32_t newSimulationMode);		// Handle M37 to change the simulation mode
 
 	GCodeResult WriteConfigOverrideFile(GCodeBuffer& gb, const StringRef& reply) const; // Write the config-override file
+	GCodeResult WriteConfigHeadsPadsFile(GCodeBuffer& gb, const StringRef& reply) const;
+
 	bool WriteConfigOverrideHeader(FileStore *f) const;							// Write the config-override header
 
 	void CopyConfigFinalValues(GCodeBuffer& gb);							// Copy the feed rate etc. from the daemon to the input channels

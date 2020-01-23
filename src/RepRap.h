@@ -87,6 +87,20 @@ public:
 	bool IsHeaterAssignedToTool(int8_t heater) const;
 	unsigned int GetNumberOfContiguousTools() const;
 
+	void AddHead(Head* head);
+	void DeleteHead(Head* h);
+	Head* GetHead(int headNumber) const;
+	void SelectHead(int toolNumber, int headNumber);
+	void PrintHead(int headNumber, const StringRef& reply) const;
+
+	void AddPad(Pad* pad);
+	void DeletePad(Pad* p);
+	Pad* GetPad(int padNumber) const;
+	void SelectPad(int padNumber);
+	void PrintPad(int padNumber, const StringRef& reply) const;
+
+	Pad* GetCurrentPad() const;
+
 	unsigned int GetProhibitedExtruderMovements(unsigned int extrusions, unsigned int retractions);
 	void PrintTool(int toolNumber, const StringRef& reply) const;
 	void FlagTemperatureFault(int8_t dudHeater);
@@ -134,6 +148,9 @@ public:
 	bool WriteToolParameters(FileStore *f) const;			// save some information in config-override.g
 	bool WriteAxisStepsParameters(FileStore *f) const;
 
+	bool WriteHeadsSettings(FileStore *f) const;
+	bool WritePadsSettings(FileStore *f) const;
+
 	void ReportInternalError(const char *file, const char *func, int line) const;	// Report an internal error
 
 	static uint32_t DoDivide(uint32_t a, uint32_t b);		// helper function for diagnostic tests
@@ -173,6 +190,14 @@ private:
  	Mutex toolListMutex, messageBoxMutex;
 	Tool* toolList;								// the tool list is sorted in order of increasing tool number
 	Tool* currentTool;
+
+	Mutex headListMutex;
+	Head* headList;
+
+	Mutex padListMutex;
+	Pad* padList;
+	Pad* currentPad;
+
 	uint32_t lastWarningMillis;					// When we last sent a warning message for things that can happen very often
 
 	//uint32_t lastSendStatus;
@@ -233,6 +258,9 @@ inline Tool* RepRap::GetCurrentTool() const { return currentTool; }
 inline uint16_t RepRap::GetExtrudersInUse() const { return activeExtruders; }
 inline uint16_t RepRap::GetToolHeatersInUse() const { return activeToolHeaters; }
 inline bool RepRap::IsStopped() const { return stopped; }
+
+inline void RepRap::SelectPad(int padNumber) {currentPad = GetPad(padNumber); }
+inline Pad* RepRap::GetCurrentPad() const { return currentPad; }
 
 #define INTERNAL_ERROR do { reprap.ReportInternalError((__FILE__), (__func__), (__LINE__)); } while(0)
 

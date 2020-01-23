@@ -26,6 +26,8 @@
 #include "Movement/Move.h"
 #include "Movement/StepTimer.h"
 #include "Tools/Tool.h"
+#include "Tools/Head.h"
+#include "Tools/Pad.h"
 #include "Network.h"
 #include "PrintMonitor.h"
 #include "FilamentMonitors/FilamentMonitor.h"

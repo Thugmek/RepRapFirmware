@@ -35,6 +35,8 @@
 #include "PrintMonitor.h"
 #include "RepRap.h"
 #include "Tools/Tool.h"
+#include "Tools/Head.h"
+#include "Tools/Pad.h"
 
 #if HAS_WIFI_NETWORKING
 # include "FirmwareUpdater.h"
@@ -3797,6 +3799,8 @@ void GCodes::StartPrinting(bool fromStart)
 
 	fileGCode->SetToolNumberAdjust(0);								// clear tool number adjustment
 
+	//SetAllAxesNotHomed();
+
 	// Reset all extruder positions when starting a new print
 	for (size_t extruder = 0; extruder < MaxExtruders; extruder++)
 	{
@@ -4123,6 +4127,205 @@ GCodeResult GCodes::ManageTool(GCodeBuffer& gb, const StringRef& reply)
 	{
 		reprap.PrintTool(toolNumber, reply);
 	}
+	return GCodeResult::ok;
+}
+
+// Create a new head definition
+GCodeResult GCodes::ManageHead(GCodeBuffer& gb, const StringRef& reply)
+{
+	// Check head number
+	bool seen = false;
+	if (!gb.Seen('P'))
+	{
+		return GCodeResult::error;
+	}
+
+	const unsigned int headNumber = gb.GetUIValue();
+
+	// Check head name
+	String<ToolNameLength> name;
+	if (gb.Seen('S'))
+	{
+		if (!gb.GetQuotedString(name.GetRef()))
+		{
+			reply.copy("Invalid head name");
+			return GCodeResult::error;
+		}
+		seen = true;
+	}
+
+	int t = 0;
+	if (gb.Seen('T'))
+	{
+		t = gb.GetIValue();
+
+		seen = true;
+	}
+
+	if (seen)
+	{
+		if (!LockMovementAndWaitForStandstill(gb))
+		{
+			return GCodeResult::notFinished;
+		}
+
+		// Add or delete tool, so start by deleting the old one with this number, if any
+		reprap.DeleteHead(reprap.GetHead(headNumber));
+
+		Head* const head = Head::Create(headNumber, name.c_str(), reply);
+		if (head == nullptr)
+		{
+			return GCodeResult::error;
+		}
+		reprap.AddHead(head);
+	}
+	else
+	{
+		reprap.PrintHead(headNumber, reply);
+	}
+	return GCodeResult::ok;
+}
+
+// Create a new pad definition
+GCodeResult GCodes::ManagePad(GCodeBuffer& gb, const StringRef& reply)
+{
+	// Check pad number
+	bool seen = false;
+	if (!gb.Seen('P'))
+	{
+		return GCodeResult::error;
+	}
+
+	const unsigned int padNumber = gb.GetUIValue();
+
+	// Check head name
+	String<PadNameLength> name;
+	if (gb.Seen('S'))
+	{
+		if (!gb.GetQuotedString(name.GetRef()))
+		{
+			reply.copy("Invalid pad name");
+			return GCodeResult::error;
+		}
+		seen = true;
+	}
+
+	int t = 0;
+	if (gb.Seen('T'))
+	{
+		t = gb.GetIValue();
+
+		seen = true;
+	}
+
+	if (seen)
+	{
+		if (!LockMovementAndWaitForStandstill(gb))
+		{
+			return GCodeResult::notFinished;
+		}
+
+		// Add or delete tool, so start by deleting the old one with this number, if any
+		reprap.DeletePad(reprap.GetPad(padNumber));
+
+		Pad* const pad = Pad::Create(padNumber, name.c_str(), reply);
+		if (pad == nullptr)
+		{
+			return GCodeResult::error;
+		}
+		reprap.AddPad(pad);
+
+		return WriteConfigHeadsPadsFile(gb, reply);
+	}
+	else
+	{
+		reprap.PrintPad(padNumber, reply);
+	}
+	return GCodeResult::ok;
+}
+
+GCodeResult GCodes::SelectHeadAndPad(GCodeBuffer& gb, const StringRef& reply)
+{
+	bool seen = false;
+
+	if (gb.Seen('P'))
+	{
+		reprap.SelectPad(gb.GetIValue());
+
+		seen = true;
+	}
+
+	if (gb.Seen('H'))
+	{
+		Head* const head = reprap.GetHead(gb.GetIValue());
+		if (head != nullptr)
+		{
+			Tool* const tool = gb.Seen('T') ? reprap.GetTool(gb.GetIValue()) : reprap.GetCurrentTool();
+			if (tool != nullptr)
+			{
+				tool->SetHead(head);
+
+				seen = true;
+			}
+			else
+			{
+				reply.copy("Invalid tool number");
+				return GCodeResult::error;
+			}
+		}
+		else
+		{
+			reply.copy("Non-existent head");
+			return GCodeResult::error;
+		}
+	}
+
+	if (!seen)
+	{
+		Pad* const p = reprap.GetCurrentPad();
+		if (p != nullptr)
+		{
+			reprap.PrintPad(p->GetNumber(), reply);
+		}
+	}
+
+	return GCodeResult::ok;
+}
+
+// Write the config-override file returning true if an error occurred
+GCodeResult GCodes::WriteConfigHeadsPadsFile(GCodeBuffer& gb, const StringRef& reply) const
+{
+	const char* const fileName = CONFIG_HEADS_PADS_FILE;
+	FileStore * const f = platform.OpenSysFile(fileName, OpenMode::write);
+	if (f == nullptr)
+	{
+		reply.printf("Failed to create file %s", fileName);
+		return GCodeResult::error;
+	}
+
+	bool ok = true;
+	if (ok)
+	{
+		ok = reprap.WriteHeadsSettings(f);
+	}
+
+	if (ok)
+	{
+		ok = reprap.WritePadsSettings(f);
+	}
+
+	if (!f->Close())
+	{
+		ok = false;
+	}
+
+	if (!ok)
+	{
+		reply.printf("Failed to write file %s", fileName);
+		platform.DeleteSysFile(fileName);
+		return GCodeResult::error;
+	}
+
 	return GCodeResult::ok;
 }
 
@@ -5217,6 +5420,16 @@ GCodeResult GCodes::WriteConfigOverrideFile(GCodeBuffer& gb, const StringRef& re
 	if (ok)
 	{
 		ok = WriteScaleCartesianFactor(f);
+	}
+
+	if (ok)
+	{
+		ok = reprap.WriteHeadsSettings(f);
+	}
+
+	if (ok)
+	{
+		ok = reprap.WritePadsSettings(f);
 	}
 
 	if (!f->Close())

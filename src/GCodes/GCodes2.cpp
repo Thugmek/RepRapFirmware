@@ -18,6 +18,8 @@
 #include "PrintMonitor.h"
 #include "RepRap.h"
 #include "Tools/Tool.h"
+#include "Tools/Head.h"
+#include "Tools/Pad.h"
 #include "FilamentMonitors/FilamentMonitor.h"
 #include "General/IP4String.h"
 #include "Movement/StepperDrivers/DriverMode.h"
@@ -2995,6 +2997,8 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				m501SeenInConfigFile = true;
 			}
 			DoFileMacro(gb, CONFIG_OVERRIDE_G, true, code);
+
+			DoFileMacro(gb, CONFIG_HEADS_PADS_FILE, false, code); // Load print heads and pads configuration
 		}
 		break;
 
@@ -4751,6 +4755,26 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				break;
 			}
 		}
+		break;
+
+	case 1800: // Select head and pad
+		result = SelectHeadAndPad(gb, reply);
+		break;
+
+	case 1810: // Define head
+		result = ManageHead(gb, reply);
+		break;
+
+	case 1820: // Define pad
+		result = ManagePad(gb, reply);
+		break;
+
+	case 1850: // Save heads and pads config
+		result = WriteConfigHeadsPadsFile(gb, reply);
+		break;
+
+	case 1851: // Load
+		// result = LoadConfigHeadsPads(gb, reply);
 		break;
 
 	default:
