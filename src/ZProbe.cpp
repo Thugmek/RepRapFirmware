@@ -36,6 +36,15 @@ bool ZProbe::WriteParameters(FileStore *f, unsigned int probeType) const
 {
 	String<ScratchStringLength> scratchString;
 	scratchString.printf("G31 T%u P%d X%.1f Y%.1f Z%.2f\n", probeType, adcValue, (double)xOffset, (double)yOffset, (double)triggerHeight);
+
+	return f->Write(scratchString.c_str());
+}
+
+bool ZProbe::WriteTriggerHeight(FileStore *f, unsigned int probeType) const
+{
+	String<ScratchStringLength> scratchString;
+	scratchString.printf("G31 T%u Z%.2f\n", probeType, (double)triggerHeight);
+
 	return f->Write(scratchString.c_str());
 }
 

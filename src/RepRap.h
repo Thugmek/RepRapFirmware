@@ -89,17 +89,28 @@ public:
 
 	void AddHead(Head* head);
 	void DeleteHead(Head* h);
+	void SelectHead(Tool* tool, Head* head);
 	Head* GetHead(int headNumber) const;
-	void SelectHead(int toolNumber, int headNumber);
 	void PrintHead(int headNumber, const StringRef& reply) const;
+	void PrintHeads(const StringRef& reply) const;
 
 	void AddPad(Pad* pad);
 	void DeletePad(Pad* p);
+	void SelectPad(Pad* pad);
 	Pad* GetPad(int padNumber) const;
-	void SelectPad(int padNumber);
 	void PrintPad(int padNumber, const StringRef& reply) const;
+	void PrintPads(const StringRef& reply) const;
 
+	Head* GetCurrentHead() const;
+	int GetCurrentHeadNumber() const;
 	Pad* GetCurrentPad() const;
+	int GetCurrentPadNumber() const;
+
+	void PrintCurrentHead(const StringRef& reply) const;
+	void PrintCurrentPad(const StringRef& reply) const;
+
+	void SetAccessoryInitialized(const bool initialized);
+	bool GetAccessoryInitialized() const;
 
 	unsigned int GetProhibitedExtruderMovements(unsigned int extrusions, unsigned int retractions);
 	void PrintTool(int toolNumber, const StringRef& reply) const;
@@ -148,8 +159,12 @@ public:
 	bool WriteToolParameters(FileStore *f) const;			// save some information in config-override.g
 	bool WriteAxisStepsParameters(FileStore *f) const;
 
-	bool WriteHeadsSettings(FileStore *f) const;
-	bool WritePadsSettings(FileStore *f) const;
+	bool WriteHeadsList(FileStore *f) const;
+	bool WritePadsList(FileStore *f) const;
+	bool WriteSelectedHeads(FileStore *f) const;
+	bool WriteSelectedPad(FileStore *f) const;
+
+	bool WriteAccessoryStatus(FileStore *f) const;
 
 	void ReportInternalError(const char *file, const char *func, int line) const;	// Report an internal error
 
@@ -231,6 +246,7 @@ private:
 
 	// Deferred diagnostics
 	MessageType diagnosticsDestination;
+	bool accessoryInitialized;
 	bool justSentDiagnostics;
 };
 
@@ -259,7 +275,6 @@ inline uint16_t RepRap::GetExtrudersInUse() const { return activeExtruders; }
 inline uint16_t RepRap::GetToolHeatersInUse() const { return activeToolHeaters; }
 inline bool RepRap::IsStopped() const { return stopped; }
 
-inline void RepRap::SelectPad(int padNumber) {currentPad = GetPad(padNumber); }
 inline Pad* RepRap::GetCurrentPad() const { return currentPad; }
 
 #define INTERNAL_ERROR do { reprap.ReportInternalError((__FILE__), (__func__), (__LINE__)); } while(0)

@@ -159,6 +159,8 @@ public:
 	bool RunConfigFile(const char* fileName);							// Start running the config file
 	bool IsDaemonBusy() const;											// Return true if the daemon is busy running config.g or a trigger file
 
+	bool RunZProbeParametersFile(const char* fileName);
+
 	bool IsAxisHomed(unsigned int axis) const							// Has the axis been homed?
 		{ return IsBitSet(axesHomed, axis); }
 	void SetAxisIsHomed(unsigned int axis);								// Tell us that the axis is now homed
@@ -343,7 +345,9 @@ private:
 	GCodeResult ManageTool(GCodeBuffer& gb, const StringRef& reply);			// Create a new tool definition
 	GCodeResult ManageHead(GCodeBuffer& gb, const StringRef& reply);
 	GCodeResult ManagePad(GCodeBuffer& gb, const StringRef& reply);
-	GCodeResult SelectHeadAndPad(GCodeBuffer& gb, const StringRef& reply);
+	GCodeResult SelectHead(GCodeBuffer& gb, const StringRef& reply);
+	GCodeResult SelectPad(GCodeBuffer& gb, const StringRef& reply);
+	GCodeResult AccessoryStatus(GCodeBuffer& gb, const StringRef& reply);
 	void SetToolHeaters(Tool *tool, float temperature, bool both);				// Set all a tool's heaters to the temperature, for M104/M109
 	bool ToolHeatersAtSetTemperatures(const Tool *tool, bool waitWhenCooling, float tolerance) const;
 																				// Wait for the heaters associated with the specified tool to reach their set temperatures
@@ -398,7 +402,6 @@ private:
 	GCodeResult ChangeSimulationMode(GCodeBuffer& gb, const StringRef &reply, uint32_t newSimulationMode);		// Handle M37 to change the simulation mode
 
 	GCodeResult WriteConfigOverrideFile(GCodeBuffer& gb, const StringRef& reply) const; // Write the config-override file
-	GCodeResult WriteConfigHeadsPadsFile(GCodeBuffer& gb, const StringRef& reply) const;
 
 	bool WriteConfigOverrideHeader(FileStore *f) const;							// Write the config-override header
 
@@ -457,7 +460,7 @@ private:
 	StreamGCodeInput* auxInput;											// ...for the GCodeBuffers below
 #endif
 
-	GCodeBuffer* gcodeSources[9];										// The various sources of gcodes
+	GCodeBuffer* gcodeSources[10];										// The various sources of gcodes
 
 	GCodeBuffer*& httpGCode = gcodeSources[0];
 	GCodeBuffer*& telnetGCode = gcodeSources[1];
@@ -465,9 +468,10 @@ private:
 	GCodeBuffer*& serialGCode = gcodeSources[3];
 	GCodeBuffer*& auxGCode = gcodeSources[4];							// This one is for the PanelDue on the async serial interface
 	GCodeBuffer*& daemonGCode = gcodeSources[5];						// Used for executing config.g and trigger macro files
-	GCodeBuffer*& queuedGCode = gcodeSources[6];
-	GCodeBuffer*& lcdGCode = gcodeSources[7];							// This one for the 12864 LCD
-	GCodeBuffer*& autoPauseGCode = gcodeSources[8];						// ***THIS ONE MUST BE LAST*** GCode state machine used to run macros on power fail, heater faults and filament out
+	GCodeBuffer*& trilabDaemonGCode = gcodeSources[6];					// Used for executing config.g and trigger macro files
+	GCodeBuffer*& queuedGCode = gcodeSources[7];
+	GCodeBuffer*& lcdGCode = gcodeSources[8];							// This one for the 12864 LCD
+	GCodeBuffer*& autoPauseGCode = gcodeSources[9];						// ***THIS ONE MUST BE LAST*** GCode state machine used to run macros on power fail, heater faults and filament out
 
 	size_t nextGcodeSource;												// The one to check next
 
@@ -673,6 +677,7 @@ private:
 #if HAS_SMART_DRIVERS
 	static constexpr const char* REHOME_G = "rehome.g";
 #endif
+	static constexpr const char* INITIALIZE_ACCESSORIES_G = "InitializeAccessory.g";
 
 	static constexpr const float MinServoPulseWidth = 544.0, MaxServoPulseWidth = 2400.0;
 };

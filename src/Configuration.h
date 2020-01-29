@@ -309,7 +309,7 @@ constexpr unsigned int MaxTriggers = 16;				// Must be <= 32 because we store a 
 constexpr float NOZZLE_DIAMETER = 0.5;					// Millimetres
 constexpr float FILAMENT_WIDTH = 1.75;					// Millimetres
 
-constexpr unsigned int MaxStackDepth = 5;				// Maximum depth of stack
+constexpr unsigned int MaxStackDepth = 8;				// Maximum depth of stack
 
 // CNC and laser support
 constexpr size_t MaxSpindles = 4;						// Maximum number of configurable spindles
@@ -364,7 +364,7 @@ constexpr size_t FILE_BUFFER_SIZE = 128;
 #define CONFIG_BACKUP_FILE "config.g.bak"
 #define DEFAULT_LOG_FILE "eventlog.txt"
 #define RESUME_AFTER_POWER_FAIL_FILE "resurrect.g"
-#define CONFIG_HEADS_PADS_FILE "config-heads-pads.g"
+#define Z_PROBE_PARAMETERS_FILE "z-probe-params-H%d-P%d.g"
 
 #define EOF_STRING "<!-- **EoF** -->"
 

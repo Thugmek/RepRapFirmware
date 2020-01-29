@@ -118,6 +118,7 @@ GCodes::GCodes(Platform& p) :
 	auxGCode = nullptr;
 #endif
 	daemonGCode = new GCodeBuffer("daemon", GenericMessage, false);
+	trilabDaemonGCode = new GCodeBuffer("trilabDaemon", GenericMessage, false);
 #if SUPPORT_12864_LCD
 	lcdGCode = new GCodeBuffer("lcd", GenericMessage, false);
 #else
@@ -355,6 +356,11 @@ bool GCodes::RunConfigFile(const char* fileName)
 bool GCodes::IsDaemonBusy() const
 {
 	return daemonGCode->MachineState().fileState.IsLive();
+}
+
+bool GCodes::RunZProbeParametersFile(const char* fileName)
+{
+	return DoFileMacro(*trilabDaemonGCode, fileName, false);
 }
 
 // Copy the feed rate etc. from the daemon to the input channels
@@ -658,6 +664,8 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 			{
 				toBeHomed &= ~axesHomed;
 
+				platform.ReadZProbeParameters();
+
 				ZProbeType probeType = platform.GetZProbeType();
 				ZProbe params = platform.GetZProbeParameters(probeType);
 				params.currentTriggerHeight = params.triggerHeight; // Save current probe height
@@ -665,10 +673,12 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 
 				if (toBeHomed == 0)
 				{
-					String<FormatStringLength> buf;
-					buf.printf("P%.3f", (double)params.currentTriggerHeight);
+					// String<FormatStringLength> buf;
+					// buf.printf("P%.3f", (double)params.currentTriggerHeight);
 
-					SendTrilabControlerRequest(gb, 100, buf.c_str(), true);
+					// SendTrilabControlerRequest(gb, 100, buf.c_str(), true);
+
+	                gb.SetState(GCodeState::normal);
 				}
 				else
 				{
@@ -3399,6 +3409,7 @@ void GCodes::EmergencyStop()
 // Run a file macro. Prior to calling this, 'state' must be set to the state we want to enter when the macro has been completed.
 // Return true if the file was found or it wasn't and we were asked to report that fact.
 // 'codeRunning' is the M command we are running, as follows;
+// 1802 = running M1802
 // 501 = running M501
 // 502 = running M502
 // 98 = running a macro explicitly via M98
@@ -3441,6 +3452,7 @@ bool GCodes::DoFileMacro(GCodeBuffer& gb, const char* fileName, bool reportMissi
 	gb.MachineState().doingFileMacro = true;
 	gb.MachineState().runningM501 = (codeRunning == 501);
 	gb.MachineState().runningM502 = (codeRunning == 502);
+	gb.MachineState().runningInitializeAccessories = (codeRunning == 1802);
 	if (codeRunning != 98)
 	{
 		gb.MachineState().runningSystemMacro = true;	// running a system macro e.g. homing or tool change, so don't use workplace coordinates
@@ -4234,8 +4246,6 @@ GCodeResult GCodes::ManagePad(GCodeBuffer& gb, const StringRef& reply)
 			return GCodeResult::error;
 		}
 		reprap.AddPad(pad);
-
-		return WriteConfigHeadsPadsFile(gb, reply);
 	}
 	else
 	{
@@ -4244,28 +4254,18 @@ GCodeResult GCodes::ManagePad(GCodeBuffer& gb, const StringRef& reply)
 	return GCodeResult::ok;
 }
 
-GCodeResult GCodes::SelectHeadAndPad(GCodeBuffer& gb, const StringRef& reply)
+GCodeResult GCodes::SelectHead(GCodeBuffer& gb, const StringRef& reply)
 {
-	bool seen = false;
-
 	if (gb.Seen('P'))
 	{
-		reprap.SelectPad(gb.GetIValue());
-
-		seen = true;
-	}
-
-	if (gb.Seen('H'))
-	{
-		Head* const head = reprap.GetHead(gb.GetIValue());
-		if (head != nullptr)
+		int headNumber = gb.GetIValue();
+		Head* const head = reprap.GetHead(headNumber);
+		if (head != nullptr or headNumber == -1)
 		{
 			Tool* const tool = gb.Seen('T') ? reprap.GetTool(gb.GetIValue()) : reprap.GetCurrentTool();
 			if (tool != nullptr)
 			{
-				tool->SetHead(head);
-
-				seen = true;
+				reprap.SelectHead(tool, head);
 			}
 			else
 			{
@@ -4279,53 +4279,52 @@ GCodeResult GCodes::SelectHeadAndPad(GCodeBuffer& gb, const StringRef& reply)
 			return GCodeResult::error;
 		}
 	}
-
-	if (!seen)
+	else
 	{
-		Pad* const p = reprap.GetCurrentPad();
-		if (p != nullptr)
-		{
-			reprap.PrintPad(p->GetNumber(), reply);
-		}
+		reprap.PrintCurrentHead(reply);
 	}
 
 	return GCodeResult::ok;
 }
 
-// Write the config-override file returning true if an error occurred
-GCodeResult GCodes::WriteConfigHeadsPadsFile(GCodeBuffer& gb, const StringRef& reply) const
+GCodeResult GCodes::SelectPad(GCodeBuffer& gb, const StringRef& reply)
 {
-	const char* const fileName = CONFIG_HEADS_PADS_FILE;
-	FileStore * const f = platform.OpenSysFile(fileName, OpenMode::write);
-	if (f == nullptr)
+	if (gb.Seen('P'))
 	{
-		reply.printf("Failed to create file %s", fileName);
-		return GCodeResult::error;
+		int padNumber = gb.GetIValue();
+		Pad* const pad = reprap.GetPad(padNumber);
+		if (pad != nullptr or padNumber == -1)
+		{
+			reprap.SelectPad(pad);
+		}
+		else
+		{
+			reply.copy("Non-existent pad");
+			return GCodeResult::error;
+		}
+	}
+	else
+	{
+		reprap.PrintCurrentPad(reply);
 	}
 
-	bool ok = true;
-	if (ok)
+	return GCodeResult::ok;
+}
+
+GCodeResult GCodes::AccessoryStatus(GCodeBuffer& gb, const StringRef& reply)
+{
+	bool seen = false;
+
+	seen = gb.Seen('I');
+	if (seen)
 	{
-		ok = reprap.WriteHeadsSettings(f);
+		reprap.SetAccessoryInitialized(gb.GetIValue());
 	}
 
-	if (ok)
+	if (!seen)
 	{
-		ok = reprap.WritePadsSettings(f);
+		reply.printf("Accessory initialized: %d", (int)reprap.GetAccessoryInitialized());
 	}
-
-	if (!f->Close())
-	{
-		ok = false;
-	}
-
-	if (!ok)
-	{
-		reply.printf("Failed to write file %s", fileName);
-		platform.DeleteSysFile(fileName);
-		return GCodeResult::error;
-	}
-
 	return GCodeResult::ok;
 }
 
@@ -5424,12 +5423,27 @@ GCodeResult GCodes::WriteConfigOverrideFile(GCodeBuffer& gb, const StringRef& re
 
 	if (ok)
 	{
-		ok = reprap.WriteHeadsSettings(f);
+		ok = reprap.WriteHeadsList(f);
 	}
 
 	if (ok)
 	{
-		ok = reprap.WritePadsSettings(f);
+		ok = reprap.WritePadsList(f);
+	}
+
+	if (ok)
+	{
+		ok = reprap.WriteSelectedHeads(f);
+	}
+
+	if (ok)
+	{
+		ok = reprap.WriteSelectedPad(f);
+	}
+
+	if (ok)
+	{
+		ok = reprap.WriteAccessoryStatus(f);
 	}
 
 	if (!f->Close())
@@ -5442,6 +5456,31 @@ GCodeResult GCodes::WriteConfigOverrideFile(GCodeBuffer& gb, const StringRef& re
 		reply.printf("Failed to write file %s", fileName);
 		platform.DeleteSysFile(fileName);
 		return GCodeResult::error;
+	}
+
+	if (ok)
+	{
+		String<MaxFilenameLength> fn;
+
+		int h = reprap.GetCurrentHeadNumber();
+		int p = reprap.GetCurrentPadNumber();
+
+		fn.printf(Z_PROBE_PARAMETERS_FILE, h, p);
+		FileStore * const f = platform.OpenSysFile(fn.c_str(), OpenMode::write);
+		if (f == nullptr)
+		{
+			reply.printf("Failed to create file %s", fn.c_str());
+			return GCodeResult::error;
+		}
+
+		platform.WriteZProbeParameters(f);
+
+		if (!f->Close())
+		{
+			reply.printf("Failed to write file %s", fn.c_str());
+			platform.DeleteSysFile(fn.c_str());
+			return GCodeResult::error;
+		}
 	}
 
 	if (!m501SeenInConfigFile)

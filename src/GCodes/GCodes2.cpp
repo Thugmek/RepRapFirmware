@@ -393,13 +393,20 @@ bool GCodes::HandleGcode(GCodeBuffer& gb, const StringRef& reply)
 			return false;
 		}
 
-		// We need to unlock the movement system here in case there is no Z probe and we are doing manual probing.
-		// Otherwise, even though the bed probing code calls UnlockAll when doing a manual bed probe, the movement system
-		// remains locked because the current MachineState object already held the lock when the macro file was started,
-		// which means that no gcode source other than the one that executed G32 is allowed to jog the Z axis.
-		UnlockAll(gb);
+		if (!reprap.GetAccessoryInitialized() && !gb.MachineState().runningInitializeAccessories)
+		{
+			DoFileMacro(gb, INITIALIZE_ACCESSORIES_G, true, 1802);	// Try to execute InitializeAccessory.g
+		}
+		else
+		{
+			// We need to unlock the movement system here in case there is no Z probe and we are doing manual probing.
+			// Otherwise, even though the bed probing code calls UnlockAll when doing a manual bed probe, the movement system
+			// remains locked because the current MachineState object already held the lock when the macro file was started,
+			// which means that no gcode source other than the one that executed G32 is allowed to jog the Z axis.
+			UnlockAll(gb);
 
-		DoFileMacro(gb, BED_EQUATION_G, true);	// Try to execute bed.g
+			DoFileMacro(gb, BED_EQUATION_G, true);	// Try to execute bed.g
+		}
 		break;
 
 	case 53:	// Temporarily use machine coordinates
@@ -2997,8 +3004,6 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				m501SeenInConfigFile = true;
 			}
 			DoFileMacro(gb, CONFIG_OVERRIDE_G, true, code);
-
-			DoFileMacro(gb, CONFIG_HEADS_PADS_FILE, false, code); // Load print heads and pads configuration
 		}
 		break;
 
@@ -4757,20 +4762,27 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		}
 		break;
 
-	case 1800: // Select head and pad
-		result = SelectHeadAndPad(gb, reply);
+	case 1800: // Accessory status
+		result = AccessoryStatus(gb, reply);
 		break;
 
 	case 1810: // Define head
 		result = ManageHead(gb, reply);
 		break;
 
+	case 1811: // Select head
+		result = SelectHead(gb, reply);
+		break;
+
 	case 1820: // Define pad
 		result = ManagePad(gb, reply);
 		break;
 
+	case 1821: // Select pad
+		result = SelectPad(gb, reply);
+		break;
+
 	case 1850: // Save heads and pads config
-		result = WriteConfigHeadsPadsFile(gb, reply);
 		break;
 
 	case 1851: // Load

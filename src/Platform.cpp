@@ -2920,6 +2920,44 @@ bool Platform::WritePlatformParameters(FileStore *f, bool includingG31) const
 	return ok;
 }
 
+bool Platform::ReadZProbeParameters()
+{
+	String<MaxFilenameLength> filename;
+
+	int h = reprap.GetCurrentHeadNumber();
+	int p = reprap.GetCurrentPadNumber();
+
+	filename.printf(Z_PROBE_PARAMETERS_FILE, h, p);
+
+	bool exists = reprap.GetGCodes().RunZProbeParametersFile(filename.c_str());
+	if (!exists)
+	{
+		SetZProbeDefaults();
+	}
+
+	return exists;
+}
+
+bool Platform::WriteZProbeParameters(FileStore *f) const
+{
+	bool ok = true;
+
+	if (ok)
+	{
+		ok = irZProbeParameters.WriteTriggerHeight(f, 1);
+	}
+	if (ok)
+	{
+		ok = alternateZProbeParameters.WriteTriggerHeight(f, 3);
+	}
+	if (ok)
+	{
+		ok = switchZProbeParameters.WriteTriggerHeight(f, 4);
+	}
+
+	return ok;
+}
+
 bool Platform::WriteAxisLimits(FileStore *f, AxesBitmap axesProbed, const float limits[MaxAxes], int sParam)
 {
 	if (axesProbed == 0)

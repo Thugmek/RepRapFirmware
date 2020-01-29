@@ -94,7 +94,7 @@ bool Pad::WriteSettings(FileStore *f) const
 
 void Pad::Print(const StringRef& reply) const
 {
-	reply.printf("Head %u - ", number);
+	reply.printf("Pad %u - ", number);
 	if (name != nullptr)
 	{
 		reply.catf("name: %s; ", name);

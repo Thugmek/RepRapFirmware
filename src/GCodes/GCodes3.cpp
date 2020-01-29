@@ -572,7 +572,18 @@ GCodeResult GCodes::SetOrReportZProbe(GCodeBuffer& gb, const StringRef &reply)
 		params.inputChannel = requestedChannel;				// set the input to the default one for this type or the requested one
 	}
 
-	gb.TryGetFValue('H', params.diveHeight, seen);			// dive height
+	if (gb.Seen('H')) // dive height
+	{
+		params.diveHeight = gb.GetFValue();
+		seen = true;
+
+		// Dive height restored to low distance, while initialize accessories macro running -> initialize accessories done
+		if (gb.MachineState().runningInitializeAccessories && params.diveHeight <= 3.0)
+		{
+			reprap.SetAccessoryInitialized(true);
+		}
+	}
+
 	if (gb.Seen('F'))										// feed rate i.e. probing speed
 	{
 		params.probeSpeed = gb.GetFValue() * SecondsToMinutes;

@@ -180,7 +180,7 @@ RepRap::RepRap() : toolList(nullptr), currentTool(nullptr), lastWarningMillis(0)
 #endif
 	spinningModule(noModule), debug(0), stopped(false),
 	active(false), resetting(false), processingConfig(true), beepFrequency(0), beepDuration(0),
-	diagnosticsDestination(MessageType::NoDestinationMessage), justSentDiagnostics(false)
+	diagnosticsDestination(MessageType::NoDestinationMessage), accessoryInitialized(false), justSentDiagnostics(false)
 {
 	OutputBuffer::Init();
 	platform = new Platform();
@@ -745,6 +745,8 @@ void RepRap::SelectTool(int toolNumber, bool simulating)
 		}
 	}
 	currentTool = newTool;
+
+	platform->ReadZProbeParameters();
 }
 
 void RepRap::PrintTool(int toolNumber, const StringRef& reply) const
@@ -887,17 +889,14 @@ Head* RepRap::GetHead(int headNumber) const
 	return nullptr; // Not an error
 }
 
-void RepRap::SelectHead(int toolNumber, int headNumber)
+void RepRap::SelectHead(Tool* tool, Head* head)
 {
-	Tool* const tool = GetTool(toolNumber);
 	if (tool != nullptr)
 	{
-		Head* const head = GetHead(headNumber);
-		if (head != nullptr)
-		{
-			tool->SetHead(head);
-		}
+		tool->SetHead(head);
 	}
+
+	SetAccessoryInitialized(false);
 }
 
 void RepRap::PrintHead(int headNumber, const StringRef& reply) const
@@ -911,6 +910,36 @@ void RepRap::PrintHead(int headNumber, const StringRef& reply) const
 	{
 		reply.copy("Error: Attempt to print details of non-existent head\n");
 	}
+}
+
+void RepRap::PrintHeads(const StringRef& reply) const
+{
+	MutexLocker lock(headListMutex);
+	for (const Head *h = headList; h != nullptr; h = h->Next())
+	{
+		String<FormatStringLength> buf;
+
+		h->Print(buf.GetRef());
+
+		reply.catf("%s\n", buf.c_str());
+	}
+}
+
+Head* RepRap::GetCurrentHead() const
+{
+	Tool* t = GetCurrentTool();
+	if (t != nullptr)
+	{
+		return t->GetHead();
+	}
+	return nullptr;
+}
+
+int RepRap::GetCurrentHeadNumber() const
+{
+	Head* h = GetCurrentHead();
+
+	return (h != nullptr) ? h->GetNumber() : -1;
 }
 
 void RepRap::AddPad(Pad* pad)
@@ -948,6 +977,13 @@ void RepRap::DeletePad(Pad* pad)
 	Pad::Delete(pad);
 }
 
+void RepRap::SelectPad(Pad* pad)
+{
+	currentPad = pad;
+
+	SetAccessoryInitialized(false);
+}
+
 Pad* RepRap::GetPad(int padNumber) const
 {
 	MutexLocker lock(padListMutex);
@@ -974,6 +1010,50 @@ void RepRap::PrintPad(int padNumber, const StringRef& reply) const
 	{
 		reply.copy("Error: Attempt to print details of non-existent pad\n");
 	}
+}
+
+void RepRap::PrintPads(const StringRef& reply) const
+{
+	MutexLocker lock(padListMutex);
+	for (const Pad *p = padList; p != nullptr; p = p->Next())
+	{
+		String<FormatStringLength> buf;
+
+		p->Print(buf.GetRef());
+
+		reply.catf("%s\n", buf.c_str());
+	}
+}
+
+int RepRap::GetCurrentPadNumber() const
+{
+	Pad* p = GetCurrentPad();
+
+	return (p != nullptr) ? p->GetNumber() : -1;
+}
+
+void RepRap::PrintCurrentHead(const StringRef& reply) const
+{
+	MutexLocker lock(toolListMutex);
+	for (const Tool *t = toolList; t != nullptr; t = t->Next())
+	{
+		reply.catf("Tool %d -> Head %d\n", t->Number(), t->head != nullptr ? t->head->GetNumber() : -1);
+	}
+}
+
+void RepRap::PrintCurrentPad(const StringRef& reply) const
+{
+	reply.catf("Bed -> Pad %d\n", GetCurrentPad() != nullptr ? GetCurrentPad()->GetNumber() : -1);
+}
+
+void RepRap::SetAccessoryInitialized(const bool initialized)
+{
+	accessoryInitialized = initialized;
+}
+
+bool RepRap::GetAccessoryInitialized() const
+{
+	return accessoryInitialized;
 }
 
 void RepRap::Tick()
@@ -2632,10 +2712,10 @@ bool RepRap::WriteAxisStepsParameters(FileStore *f) const
 	return f->Write(scratchString.c_str());
 }
 
-bool RepRap::WriteHeadsSettings(FileStore *f) const
+bool RepRap::WriteHeadsList(FileStore *f) const
 {
 	// First write the settings of all tools except the current one and the command to select them if they are on standby
-	bool ok = f->Write("; Print Heads\n");
+	bool ok = f->Write("; Print Heads list\n");
 
 	MutexLocker lock(headListMutex);
 	for (const Head *h = headList; h != nullptr && ok; h = h->Next())
@@ -2646,10 +2726,10 @@ bool RepRap::WriteHeadsSettings(FileStore *f) const
 	return ok;
 }
 
-bool RepRap::WritePadsSettings(FileStore *f) const
+bool RepRap::WritePadsList(FileStore *f) const
 {
 	// First write the settings of all tools except the current one and the command to select them if they are on standby
-	bool ok = f->Write("; Print Pads\n");
+	bool ok = f->Write("; Print Pads list\n");
 
 	MutexLocker lock(padListMutex);
 	for (const Pad *p = padList; p != nullptr && ok; p = p->Next())
@@ -2658,6 +2738,40 @@ bool RepRap::WritePadsSettings(FileStore *f) const
 	}
 
 	return ok;
+}
+
+bool RepRap::WriteSelectedHeads(FileStore *f) const
+{
+	String<FormatStringLength> buf;
+
+	buf.copy("; Restore selected heads\n");
+	MutexLocker lock(toolListMutex);
+	for (const Tool *t = toolList; t != nullptr; t = t->Next())
+	{
+		buf.catf("M1811 T%d P%d\n", t->Number(), t->head != nullptr ? t->head->GetNumber() : -1);
+	}
+
+	return f->Write(buf.c_str());
+}
+
+bool RepRap::WriteSelectedPad(FileStore *f) const
+{
+	String<FormatStringLength> buf;
+
+	buf.copy("; Restore selected pad\n");
+	buf.catf("M1821 P%d\n", GetCurrentPad() != nullptr ? GetCurrentPad()->GetNumber() : -1);
+
+	return f->Write(buf.c_str());
+}
+
+bool RepRap::WriteAccessoryStatus(FileStore *f) const
+{
+	String<FormatStringLength> buf;
+
+	buf.copy("; Restore accessory status\n");
+	buf.catf("M1800 I%d\n", (int)GetAccessoryInitialized());
+
+	return f->Write(buf.c_str());
 }
 
 // Helper function for diagnostic tests in Platform.cpp, to cause a deliberate divide-by-zero

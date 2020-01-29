@@ -51,6 +51,7 @@ public:
 	void Init(float h);
 	float GetStopHeight(float temperature) const;
 	bool WriteParameters(FileStore *f, unsigned int probeType) const;
+	bool WriteTriggerHeight(FileStore *f, unsigned int probeType) const;
 };
 
 #endif /* SRC_ZPROBE_H_ */
