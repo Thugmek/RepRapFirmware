@@ -364,7 +364,7 @@ constexpr size_t FILE_BUFFER_SIZE = 128;
 #define CONFIG_BACKUP_FILE "config.g.bak"
 #define DEFAULT_LOG_FILE "eventlog.txt"
 #define RESUME_AFTER_POWER_FAIL_FILE "resurrect.g"
-#define Z_PROBE_PARAMETERS_FILE "z-probe-params-H%d-P%d.g"
+#define ACCESSORY_PARAMETERS_FILE "accessory-parameters-H%d-P%d.g"
 
 #define EOF_STRING "<!-- **EoF** -->"
 

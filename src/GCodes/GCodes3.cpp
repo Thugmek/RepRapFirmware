@@ -57,11 +57,28 @@ GCodeResult GCodes::SetPrintZProbe(GCodeBuffer& gb, const StringRef& reply)
 		seenT = false;
 	}
 
+	const bool read = gb.Seen('R');
+
 	ZProbe params = platform.GetZProbeParameters(probeType);
 	bool seen = false;
 	gb.TryGetFValue(axisLetters[X_AXIS], params.xOffset, seen);
 	gb.TryGetFValue(axisLetters[Y_AXIS], params.yOffset, seen);
-	gb.TryGetFValue(axisLetters[Z_AXIS], params.triggerHeight, seen);
+
+	if (gb.Seen(axisLetters[Z_AXIS]))
+	{
+		seen = true;
+		params.triggerHeight = gb.GetFValue();
+
+		if (read) // Reading from parameters file
+		{
+			params.currentTriggerHeight = params.triggerHeight;
+		}
+		else
+		{
+			reprap.SetAccessoryInitialized(false);
+		}
+	}
+
 	if (gb.Seen('P'))
 	{
 		seen = true;
@@ -103,28 +120,35 @@ GCodeResult GCodes::SetPrintZProbe(GCodeBuffer& gb, const StringRef& reply)
 	}
 	else
 	{
-		if (seenT)
+		if (gb.GetCommandNumber() == 1031)
 		{
-			reply.printf("Probe type %u:", (unsigned int)probeType);
+			reply.catf("X%.1f Y%.1f Z%.2f", (double)params.xOffset, (double)params.yOffset, (double)params.triggerHeight);
 		}
 		else
 		{
-			const int v0 = platform.GetZProbeReading();
-			int v1, v2;
-			switch (platform.GetZProbeSecondaryValues(v1, v2))
+			if (seenT)
 			{
-			case 1:
-				reply.printf("Current reading %d (%d)", v0, v1);
-				break;
-			case 2:
-				reply.printf("Current reading %d (%d, %d)", v0, v1, v2);
-				break;
-			default:
-				reply.printf("Current reading %d", v0);
-				break;
+				reply.printf("Probe type %u:", (unsigned int)probeType);
 			}
+			else
+			{
+				const int v0 = platform.GetZProbeReading();
+				int v1, v2;
+				switch (platform.GetZProbeSecondaryValues(v1, v2))
+				{
+				case 1:
+					reply.printf("Current reading %d (%d)", v0, v1);
+					break;
+				case 2:
+					reply.printf("Current reading %d (%d, %d)", v0, v1, v2);
+					break;
+				default:
+					reply.printf("Current reading %d", v0);
+					break;
+				}
+			}
+			reply.catf(", threshold %d, trigger height %.2f, offsets X%.1f Y%.1f", params.adcValue, (double)params.triggerHeight, (double)params.xOffset, (double)params.yOffset);
 		}
-		reply.catf(", threshold %d, trigger height %.2f, offsets X%.1f Y%.1f", params.adcValue, (double)params.triggerHeight, (double)params.xOffset, (double)params.yOffset);
 	}
 	return GCodeResult::ok;
 }
@@ -576,6 +600,8 @@ GCodeResult GCodes::SetOrReportZProbe(GCodeBuffer& gb, const StringRef &reply)
 	{
 		params.diveHeight = gb.GetFValue();
 		seen = true;
+
+		platform.MessageF(BlockingUsbMessage, "runningInitializeAccessories %d\n", (int)gb.MachineState().runningInitializeAccessories);
 
 		// Dive height restored to low distance, while initialize accessories macro running -> initialize accessories done
 		if (gb.MachineState().runningInitializeAccessories && params.diveHeight <= 3.0)

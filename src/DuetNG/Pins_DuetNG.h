@@ -12,7 +12,7 @@ constexpr size_t NumFirmwareUpdateModules = 4;		// 3 modules, plus one for manua
 
 // Features definition
 #define HAS_LWIP_NETWORKING		0
-#define HAS_WIFI_NETWORKING		1
+#define HAS_WIFI_NETWORKING		0
 #define HAS_W5500_NETWORKING	1
 
 #define HAS_CPU_TEMP_SENSOR		1
@@ -26,13 +26,13 @@ constexpr size_t NumFirmwareUpdateModules = 4;		// 3 modules, plus one for manua
 #define SUPPORT_INKJET			0					// set nonzero to support inkjet control
 #define SUPPORT_ROLAND			0					// set nonzero to support Roland mill
 #define SUPPORT_SCANNER			0					// set zero to disable support for FreeLSS scanners
-#define SUPPORT_LASER			1					// support laser cutters and engravers using G1 S parameter
-#define SUPPORT_IOBITS			1					// set to support P parameter in G0/G1 commands
+#define SUPPORT_LASER			0					// support laser cutters and engravers using G1 S parameter
+#define SUPPORT_IOBITS			0					// set to support P parameter in G0/G1 commands
 #define SUPPORT_DHT_SENSOR		0					// set nonzero to support DHT temperature/humidity sensors
 #define SUPPORT_WORKPLACE_COORDINATES	1			// set nonzero to support G10 L2 and G53..59
 #define SUPPORT_12864_LCD		0					// set nonzero to support 12864 LCD and rotary encoder
 #define SUPPORT_OBJECT_MODEL	1
-#define SUPPORT_FTP				1
+#define SUPPORT_FTP				0
 #define SUPPORT_TELNET			0
 
 #define USE_CACHE				1					// set nonzero to enable the cache

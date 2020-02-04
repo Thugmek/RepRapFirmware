@@ -15,6 +15,7 @@ void ZProbe::Init(float h)
 	adcValue = DefaultZProbeADValue;
 	xOffset = yOffset = 0.0;
 	triggerHeight = h;
+	currentTriggerHeight = h;
 	calibTemperature = 20.0;
 	temperatureCoefficient = 0.0;	// no default temperature correction
 	diveHeight = DefaultZDive;
@@ -43,7 +44,7 @@ bool ZProbe::WriteParameters(FileStore *f, unsigned int probeType) const
 bool ZProbe::WriteTriggerHeight(FileStore *f, unsigned int probeType) const
 {
 	String<ScratchStringLength> scratchString;
-	scratchString.printf("G31 T%u Z%.2f\n", probeType, (double)triggerHeight);
+	scratchString.printf("G31 T%u Z%.2f R\n", probeType, (double)triggerHeight);
 
 	return f->Write(scratchString.c_str());
 }

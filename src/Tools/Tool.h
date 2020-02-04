@@ -89,6 +89,7 @@ public:
 
 	Head *GetHead() const;
 	void SetHead(Head *h);
+	int GetHeadNumber() const;
 
 	friend class RepRap;
 

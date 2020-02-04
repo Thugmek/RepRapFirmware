@@ -88,6 +88,18 @@ bool GCodes::ActOnCode(GCodeBuffer& gb, const StringRef& reply)
 		}
 		break;
 
+	case 'H':
+		{
+			return HandleHcode(gb, reply);
+		}
+		break;
+
+	case 'P':
+		{
+			return HandlePcode(gb, reply);
+		}
+		break;
+
 	case 'O':
 		if (gb.HasCommandNumber())
 		{
@@ -460,14 +472,7 @@ bool GCodes::HandleGcode(GCodeBuffer& gb, const StringRef& reply)
 		break;
 
 	case 1031: // Return the probe value, or set probe variables
-		{
-			ZProbeType probeType = platform.GetZProbeType();
-			ZProbe params = platform.GetZProbeParameters(probeType);
-
-			reply.catf("X%.1f Y%.1f Z%.2f", (double)params.xOffset, (double)params.yOffset, (double)params.triggerHeight);
-
-		}
-		result = GCodeResult::ok;
+		result = SetPrintZProbe(gb, reply);
 		break;
 
 	default:
@@ -1734,7 +1739,11 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		{
 			String<MediumStringLength> msg;
 			gb.GetUnprecedentedString(msg.GetRef());
-			reprap.SetMessage(msg.c_str());
+
+			if (strncmp(msg.c_str(), "Time Left", 9) != 0)
+			{
+				reprap.SetMessage(msg.c_str());
+			}
 		}
 		break;
 
@@ -4770,23 +4779,8 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		result = ManageHead(gb, reply);
 		break;
 
-	case 1811: // Select head
-		result = SelectHead(gb, reply);
-		break;
-
 	case 1820: // Define pad
 		result = ManagePad(gb, reply);
-		break;
-
-	case 1821: // Select pad
-		result = SelectPad(gb, reply);
-		break;
-
-	case 1850: // Save heads and pads config
-		break;
-
-	case 1851: // Load
-		// result = LoadConfigHeadsPads(gb, reply);
 		break;
 
 	default:
@@ -4847,22 +4841,52 @@ bool GCodes::HandleTcode(GCodeBuffer& gb, const StringRef& reply)
 			return false;
 		}
 
-		const Tool * const oldTool = reprap.GetCurrentTool();
-		// If old and new are the same we no longer follow the sequence. User can deselect and then reselect the tool if he wants the macros run.
-		if (oldTool == nullptr || oldTool->Number() != toolNum)
+		if (gb.Seen('H')) // Select Head for Tool
 		{
-			gb.MachineState().newToolNumber = toolNum;
-			gb.MachineState().toolChangeParam = (simulationMode != 0) ? 0
-													: gb.Seen('P') ? gb.GetUIValue()
-														: DefaultToolChangeParam;
-			gb.SetState(GCodeState::toolChange0);
-			return true;							// proceeding with state machine, so don't unlock or send a reply
+			const int headNumber = gb.GetIValue();
+
+			Head* const head = reprap.GetHead(headNumber);
+			if (head != nullptr or headNumber == -1)
+			{
+				Tool* const tool = reprap.GetTool(toolNum);
+				if (tool != nullptr)
+				{
+					reprap.SelectHead(tool, head);
+				}
+				else
+				{
+					UnlockAll(gb);
+					HandleReply(gb, GCodeResult::error, "Invalid tool number");
+					return true;
+				}
+			}
+			else
+			{
+				UnlockAll(gb);
+				HandleReply(gb, GCodeResult::error, "Non-existent head");
+				return true;
+			}
+
 		}
-		else
+		else // Select Tool
 		{
-			// Even though the tool is selected, we may have turned it off e.g. when upgrading the WiFi firmware or following a heater fault that has been cleared.
-			// So make sure the tool heaters are on.
-			reprap.SelectTool(toolNum, simulationMode != 0);
+			const Tool * const oldTool = reprap.GetCurrentTool();
+			// If old and new are the same we no longer follow the sequence. User can deselect and then reselect the tool if he wants the macros run.
+			if (oldTool == nullptr || oldTool->Number() != toolNum)
+			{
+				gb.MachineState().newToolNumber = toolNum;
+				gb.MachineState().toolChangeParam = (simulationMode != 0) ? 0
+														: gb.Seen('P') ? gb.GetUIValue()
+																: DefaultToolChangeParam;
+				gb.SetState(GCodeState::toolChange0);
+				return true;							// proceeding with state machine, so don't unlock or send a reply
+			}
+			else
+			{
+				// Even though the tool is selected, we may have turned it off e.g. when upgrading the WiFi firmware or following a heater fault that has been cleared.
+				// So make sure the tool heaters are on.
+				reprap.SelectTool(toolNum, simulationMode != 0);
+			}
 		}
 	}
 	else
@@ -4875,7 +4899,7 @@ bool GCodes::HandleTcode(GCodeBuffer& gb, const StringRef& reply)
 		}
 		else
 		{
-			reply.printf("Tool %d is selected", tool->Number());
+			reply.printf("Tool %d with Head %d is selected", tool->Number(), tool->GetHeadNumber());
 		}
 	}
 
@@ -4883,6 +4907,81 @@ bool GCodes::HandleTcode(GCodeBuffer& gb, const StringRef& reply)
 	UnlockAll(gb);
 	HandleReply(gb, GCodeResult::ok, reply.c_str());
 	return true;
+}
+
+bool GCodes::HandleHcode(GCodeBuffer& gb, const StringRef& reply)
+{
+	GCodeResult result = GCodeResult::ok;
+	OutputBuffer *outBuf = nullptr;
+
+	if (gb.MachineState().runningM502)
+	{
+		return true;			// when running M502 we don't execute P commands
+	}
+
+	int headNumber;
+	if (gb.HasCommandNumber())
+	{
+		headNumber = gb.GetIValue();
+		Head* const head = reprap.GetHead(headNumber);
+		if (head != nullptr or headNumber == -1)
+		{
+			Tool* const tool = reprap.GetCurrentTool();
+			if (tool != nullptr)
+			{
+				reprap.SelectHead(tool, head);
+			}
+			else
+			{
+				reply.copy("Invalid tool number");
+				result = GCodeResult::error;
+			}
+		}
+		else
+		{
+			reply.copy("Non-existent head");
+			result = GCodeResult::error;
+		}
+	}
+	else
+	{
+		reprap.PrintCurrentHead(reply);
+	}
+
+	return HandleResult(gb, result, reply, outBuf);
+}
+
+bool GCodes::HandlePcode(GCodeBuffer& gb, const StringRef& reply)
+{
+	GCodeResult result = GCodeResult::ok;
+	OutputBuffer *outBuf = nullptr;
+
+	if (gb.MachineState().runningM502)
+	{
+		return true;			// when running M502 we don't execute P commands
+	}
+
+	int padNumber;
+	if (gb.HasCommandNumber())
+	{
+		padNumber = gb.GetCommandNumber();
+		Pad* const pad = reprap.GetPad(padNumber);
+		if (pad != nullptr or padNumber == -1)
+		{
+			reprap.SelectPad(pad);
+		}
+		else
+		{
+			reply.copy("Non-existent pad");
+			result = GCodeResult::error;
+		}
+	}
+	else
+	{
+		reprap.PrintCurrentPad(reply);
+	}
+
+	return HandleResult(gb, result, reply, outBuf);
 }
 
 // This is called to deal with the result of processing a G- or M-code

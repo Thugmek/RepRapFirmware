@@ -34,8 +34,8 @@
 #include "Scanner.h"
 #include "PrintMonitor.h"
 #include "RepRap.h"
-#include "Tools/Tool.h"
 #include "Tools/Head.h"
+#include "Tools/Tool.h"
 #include "Tools/Pad.h"
 
 #if HAS_WIFI_NETWORKING
@@ -358,8 +358,9 @@ bool GCodes::IsDaemonBusy() const
 	return daemonGCode->MachineState().fileState.IsLive();
 }
 
-bool GCodes::RunZProbeParametersFile(const char* fileName)
+bool GCodes::RunAccessoryParametersFile(const char* fileName)
 {
+	// return DoFileMacro(runningConfigFile ? *trilabDaemonGCode : gb, fileName, false, 1031);
 	return DoFileMacro(*trilabDaemonGCode, fileName, false);
 }
 
@@ -664,19 +665,14 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 			{
 				toBeHomed &= ~axesHomed;
 
-				platform.ReadZProbeParameters();
-
-				ZProbeType probeType = platform.GetZProbeType();
-				ZProbe params = platform.GetZProbeParameters(probeType);
-				params.currentTriggerHeight = params.triggerHeight; // Save current probe height
-				platform.SetZProbeParameters(probeType, params);
-
 				if (toBeHomed == 0)
 				{
 					// String<FormatStringLength> buf;
 					// buf.printf("P%.3f", (double)params.currentTriggerHeight);
 
 					// SendTrilabControlerRequest(gb, 100, buf.c_str(), true);
+
+					platform.ReadAccessoryParameters();
 
 	                gb.SetState(GCodeState::normal);
 				}
@@ -4147,54 +4143,57 @@ GCodeResult GCodes::ManageHead(GCodeBuffer& gb, const StringRef& reply)
 {
 	// Check head number
 	bool seen = false;
-	if (!gb.Seen('P'))
+	if (gb.Seen('P'))
 	{
-		return GCodeResult::error;
-	}
+		const unsigned int headNumber = gb.GetUIValue();
 
-	const unsigned int headNumber = gb.GetUIValue();
-
-	// Check head name
-	String<ToolNameLength> name;
-	if (gb.Seen('S'))
-	{
-		if (!gb.GetQuotedString(name.GetRef()))
+		// Check head name
+		String<ToolNameLength> name;
+		if (gb.Seen('S'))
 		{
-			reply.copy("Invalid head name");
-			return GCodeResult::error;
-		}
-		seen = true;
-	}
-
-	int t = 0;
-	if (gb.Seen('T'))
-	{
-		t = gb.GetIValue();
-
-		seen = true;
-	}
-
-	if (seen)
-	{
-		if (!LockMovementAndWaitForStandstill(gb))
-		{
-			return GCodeResult::notFinished;
+			if (!gb.GetQuotedString(name.GetRef()))
+			{
+				reply.copy("Invalid head name");
+				return GCodeResult::error;
+			}
+			seen = true;
 		}
 
-		// Add or delete tool, so start by deleting the old one with this number, if any
-		reprap.DeleteHead(reprap.GetHead(headNumber));
-
-		Head* const head = Head::Create(headNumber, name.c_str(), reply);
-		if (head == nullptr)
+		int t = 0;
+		if (gb.Seen('T'))
 		{
-			return GCodeResult::error;
+			t = gb.GetIValue();
+
+			seen = true;
 		}
-		reprap.AddHead(head);
+
+		if (seen)
+		{
+			if (!LockMovementAndWaitForStandstill(gb))
+			{
+				return GCodeResult::notFinished;
+			}
+
+			// Add or delete tool, so start by deleting the old one with this number, if any
+			reprap.DeleteHead(reprap.GetHead(headNumber));
+
+			Head* const head = Head::Create(headNumber, name.c_str(), reply);
+			if (head == nullptr)
+			{
+				return GCodeResult::error;
+			}
+			reprap.AddHead(head);
+		}
+		else
+		{
+			reprap.PrintHead(headNumber, reply);
+		}
 	}
 	else
 	{
-		reprap.PrintHead(headNumber, reply);
+		reprap.PrintHeads(reply);
 	}
+
 	return GCodeResult::ok;
 }
 
@@ -4203,109 +4202,55 @@ GCodeResult GCodes::ManagePad(GCodeBuffer& gb, const StringRef& reply)
 {
 	// Check pad number
 	bool seen = false;
-	if (!gb.Seen('P'))
-	{
-		return GCodeResult::error;
-	}
-
-	const unsigned int padNumber = gb.GetUIValue();
-
-	// Check head name
-	String<PadNameLength> name;
-	if (gb.Seen('S'))
-	{
-		if (!gb.GetQuotedString(name.GetRef()))
-		{
-			reply.copy("Invalid pad name");
-			return GCodeResult::error;
-		}
-		seen = true;
-	}
-
-	int t = 0;
-	if (gb.Seen('T'))
-	{
-		t = gb.GetIValue();
-
-		seen = true;
-	}
-
-	if (seen)
-	{
-		if (!LockMovementAndWaitForStandstill(gb))
-		{
-			return GCodeResult::notFinished;
-		}
-
-		// Add or delete tool, so start by deleting the old one with this number, if any
-		reprap.DeletePad(reprap.GetPad(padNumber));
-
-		Pad* const pad = Pad::Create(padNumber, name.c_str(), reply);
-		if (pad == nullptr)
-		{
-			return GCodeResult::error;
-		}
-		reprap.AddPad(pad);
-	}
-	else
-	{
-		reprap.PrintPad(padNumber, reply);
-	}
-	return GCodeResult::ok;
-}
-
-GCodeResult GCodes::SelectHead(GCodeBuffer& gb, const StringRef& reply)
-{
 	if (gb.Seen('P'))
 	{
-		int headNumber = gb.GetIValue();
-		Head* const head = reprap.GetHead(headNumber);
-		if (head != nullptr or headNumber == -1)
+		const unsigned int padNumber = gb.GetUIValue();
+
+		// Check head name
+		String<PadNameLength> name;
+		if (gb.Seen('S'))
 		{
-			Tool* const tool = gb.Seen('T') ? reprap.GetTool(gb.GetIValue()) : reprap.GetCurrentTool();
-			if (tool != nullptr)
+			if (!gb.GetQuotedString(name.GetRef()))
 			{
-				reprap.SelectHead(tool, head);
-			}
-			else
-			{
-				reply.copy("Invalid tool number");
+				reply.copy("Invalid pad name");
 				return GCodeResult::error;
 			}
+			seen = true;
+		}
+
+		int t = 0;
+		if (gb.Seen('T'))
+		{
+			t = gb.GetIValue();
+
+			seen = true;
+		}
+
+		if (seen)
+		{
+			if (!LockMovementAndWaitForStandstill(gb))
+			{
+				return GCodeResult::notFinished;
+			}
+
+			// Add or delete tool, so start by deleting the old one with this number, if any
+			reprap.DeletePad(reprap.GetPad(padNumber));
+
+			Pad* const pad = Pad::Create(padNumber, name.c_str(), reply);
+			if (pad == nullptr)
+			{
+				return GCodeResult::error;
+			}
+			reprap.AddPad(pad);
 		}
 		else
 		{
-			reply.copy("Non-existent head");
-			return GCodeResult::error;
+			reprap.PrintPad(padNumber, reply);
 		}
 	}
 	else
 	{
-		reprap.PrintCurrentHead(reply);
-	}
-
-	return GCodeResult::ok;
-}
-
-GCodeResult GCodes::SelectPad(GCodeBuffer& gb, const StringRef& reply)
-{
-	if (gb.Seen('P'))
-	{
-		int padNumber = gb.GetIValue();
-		Pad* const pad = reprap.GetPad(padNumber);
-		if (pad != nullptr or padNumber == -1)
-		{
-			reprap.SelectPad(pad);
-		}
-		else
-		{
-			reply.copy("Non-existent pad");
-			return GCodeResult::error;
-		}
-	}
-	else
-	{
-		reprap.PrintCurrentPad(reply);
+		reprap.PrintPads(reply);
 	}
 
 	return GCodeResult::ok;
@@ -5394,10 +5339,10 @@ GCodeResult GCodes::WriteConfigOverrideFile(GCodeBuffer& gb, const StringRef& re
 		ok = reprap.GetHeat().WriteModelParameters(f);
 	}
 
-	if (ok)
-	{
-		ok = platform.WritePlatformParameters(f, gb.Seen('P') && gb.GetIValue() == 31);
-	}
+	// if (ok)
+	// {
+	//	  ok = platform.WritePlatformParameters(f, gb.Seen('P') && gb.GetIValue() == 31);
+	// }
 
 	if (ok)
 	{
@@ -5443,6 +5388,11 @@ GCodeResult GCodes::WriteConfigOverrideFile(GCodeBuffer& gb, const StringRef& re
 
 	if (ok)
 	{
+		ok = reprap.WriteSelectedTool(f);
+	}
+
+	if (ok)
+	{
 		ok = reprap.WriteAccessoryStatus(f);
 	}
 
@@ -5465,7 +5415,7 @@ GCodeResult GCodes::WriteConfigOverrideFile(GCodeBuffer& gb, const StringRef& re
 		int h = reprap.GetCurrentHeadNumber();
 		int p = reprap.GetCurrentPadNumber();
 
-		fn.printf(Z_PROBE_PARAMETERS_FILE, h, p);
+		fn.printf(ACCESSORY_PARAMETERS_FILE, h, p);
 		FileStore * const f = platform.OpenSysFile(fn.c_str(), OpenMode::write);
 		if (f == nullptr)
 		{

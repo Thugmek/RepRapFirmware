@@ -25,6 +25,7 @@
 
 #include "Tool.h"
 #include "Filament.h"
+#include "Head.h"
 
 #include "GCodes/GCodes.h"
 #include "Heating/Heat.h"
@@ -546,6 +547,11 @@ bool Tool::UsesHeater(int8_t heater) const
 Head *Tool::GetHead() const
 {
 	return head;
+}
+
+int Tool::GetHeadNumber() const
+{
+	return (head != nullptr) ? head->GetNumber() : -1;
 }
 
 // End

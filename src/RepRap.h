@@ -163,6 +163,7 @@ public:
 	bool WritePadsList(FileStore *f) const;
 	bool WriteSelectedHeads(FileStore *f) const;
 	bool WriteSelectedPad(FileStore *f) const;
+	bool WriteSelectedTool(FileStore *f) const;
 
 	bool WriteAccessoryStatus(FileStore *f) const;
 

@@ -2920,16 +2920,16 @@ bool Platform::WritePlatformParameters(FileStore *f, bool includingG31) const
 	return ok;
 }
 
-bool Platform::ReadZProbeParameters()
+bool Platform::ReadAccessoryParameters()
 {
 	String<MaxFilenameLength> filename;
 
 	int h = reprap.GetCurrentHeadNumber();
 	int p = reprap.GetCurrentPadNumber();
 
-	filename.printf(Z_PROBE_PARAMETERS_FILE, h, p);
+	filename.printf(ACCESSORY_PARAMETERS_FILE, h, p);
 
-	bool exists = reprap.GetGCodes().RunZProbeParametersFile(filename.c_str());
+	bool exists = reprap.GetGCodes().RunAccessoryParametersFile(filename.c_str());
 	if (!exists)
 	{
 		SetZProbeDefaults();

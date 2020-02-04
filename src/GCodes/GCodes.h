@@ -159,7 +159,7 @@ public:
 	bool RunConfigFile(const char* fileName);							// Start running the config file
 	bool IsDaemonBusy() const;											// Return true if the daemon is busy running config.g or a trigger file
 
-	bool RunZProbeParametersFile(const char* fileName);
+	bool RunAccessoryParametersFile(const char* fileName);
 
 	bool IsAxisHomed(unsigned int axis) const							// Has the axis been homed?
 		{ return IsBitSet(axesHomed, axis); }
@@ -286,6 +286,8 @@ private:
 	bool HandleGcode(GCodeBuffer& gb, const StringRef& reply);			// Do a G code
 	bool HandleMcode(GCodeBuffer& gb, const StringRef& reply);			// Do an M code
 	bool HandleTcode(GCodeBuffer& gb, const StringRef& reply);			// Do a T code
+	bool HandleHcode(GCodeBuffer& gb, const StringRef& reply);			// Do a H code
+	bool HandlePcode(GCodeBuffer& gb, const StringRef& reply);			// Do a P code
 	bool HandlePaletteCode(GCodeBuffer& gb, const StringRef& reply);	// Do a O code
 	bool HandleUnknownCode(GCodeBuffer& gb, const StringRef& reply);    // Do custom code
 	bool HandleResult(GCodeBuffer& gb, GCodeResult rslt, const StringRef& reply, OutputBuffer *outBuf)
@@ -345,8 +347,6 @@ private:
 	GCodeResult ManageTool(GCodeBuffer& gb, const StringRef& reply);			// Create a new tool definition
 	GCodeResult ManageHead(GCodeBuffer& gb, const StringRef& reply);
 	GCodeResult ManagePad(GCodeBuffer& gb, const StringRef& reply);
-	GCodeResult SelectHead(GCodeBuffer& gb, const StringRef& reply);
-	GCodeResult SelectPad(GCodeBuffer& gb, const StringRef& reply);
 	GCodeResult AccessoryStatus(GCodeBuffer& gb, const StringRef& reply);
 	void SetToolHeaters(Tool *tool, float temperature, bool both);				// Set all a tool's heaters to the temperature, for M104/M109
 	bool ToolHeatersAtSetTemperatures(const Tool *tool, bool waitWhenCooling, float tolerance) const;

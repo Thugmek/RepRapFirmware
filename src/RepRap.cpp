@@ -744,9 +744,15 @@ void RepRap::SelectTool(int toolNumber, bool simulating)
 			newTool->Activate();
 		}
 	}
+
+	if (currentTool == nullptr || newTool == nullptr || currentTool->GetHeadNumber() != newTool->GetHeadNumber())
+	{
+		SetAccessoryInitialized(false);
+	}
+
 	currentTool = newTool;
 
-	platform->ReadZProbeParameters();
+	platform->ReadAccessoryParameters();
 }
 
 void RepRap::PrintTool(int toolNumber, const StringRef& reply) const
@@ -897,6 +903,11 @@ void RepRap::SelectHead(Tool* tool, Head* head)
 	}
 
 	SetAccessoryInitialized(false);
+
+	if (head == GetCurrentHead())
+	{
+		platform->ReadAccessoryParameters();
+	}
 }
 
 void RepRap::PrintHead(int headNumber, const StringRef& reply) const
@@ -982,6 +993,8 @@ void RepRap::SelectPad(Pad* pad)
 	currentPad = pad;
 
 	SetAccessoryInitialized(false);
+
+	platform->ReadAccessoryParameters();
 }
 
 Pad* RepRap::GetPad(int padNumber) const
@@ -1034,11 +1047,7 @@ int RepRap::GetCurrentPadNumber() const
 
 void RepRap::PrintCurrentHead(const StringRef& reply) const
 {
-	MutexLocker lock(toolListMutex);
-	for (const Tool *t = toolList; t != nullptr; t = t->Next())
-	{
-		reply.catf("Tool %d -> Head %d\n", t->Number(), t->head != nullptr ? t->head->GetNumber() : -1);
-	}
+	reply.printf("Head %d\n", GetCurrentHeadNumber());
 }
 
 void RepRap::PrintCurrentPad(const StringRef& reply) const
@@ -1712,12 +1721,65 @@ OutputBuffer *RepRap::GetStatusResponse(uint8_t type, ResponseSource source)
 				{
 					response->catf((i == 0) ? "%.2f" : ",%.2f", (double)tool->GetOffset(i));
 				}
+				response->cat("]");
+
+				// Head
+				response->catf(",\"head\":%d", tool->head != nullptr ? tool->head->GetNumber() : -1);
 
   				// Do we have any more tools?
-				response->cat((tool->Next() != nullptr) ? "]}," : "]}");
+				response->cat((tool->Next() != nullptr) ? "}," : "}");
 			}
 			response->cat(']');
 		}
+
+		/* Head Mapping */
+		{
+			response->cat(",\"heads\":[");
+
+			MutexLocker lock(headListMutex);
+			for (Head *head = headList; head != nullptr; head = head->Next())
+			{
+				// Number
+				response->catf("{\"number\":%d", head->GetNumber());
+
+				// Name
+				const char *headName = head->GetName();
+				if (headName[0] != 0)
+				{
+					response->cat(",\"name\":");
+					response->EncodeString(headName, false);
+				}
+		  		// Do we have any more tools?
+				response->cat((head->Next() != nullptr) ? "}," : "}");
+			}
+			response->cat(']');
+		}
+
+		/* Pad Mapping */
+		{
+			response->cat(",\"pads\":[");
+
+			MutexLocker lock(padListMutex);
+			for (Pad *pad = padList; pad != nullptr; pad = pad->Next())
+			{
+				// Number
+				response->catf("{\"number\":%d", pad->GetNumber());
+
+				// Name
+				const char *padName = pad->GetName();
+				if (padName[0] != 0)
+				{
+					response->cat(",\"name\":");
+					response->EncodeString(padName, false);
+				}
+		  		// Do we have any more tools?
+				response->cat((pad->Next() != nullptr) ? "}," : "}");
+			}
+			response->cat(']');
+		}
+
+		/* Current pad */
+		response->catf(",\"currentPad\":%d", GetCurrentPadNumber());
 
 		// MCU temperatures
 #if HAS_CPU_TEMP_SENSOR
@@ -2748,7 +2810,7 @@ bool RepRap::WriteSelectedHeads(FileStore *f) const
 	MutexLocker lock(toolListMutex);
 	for (const Tool *t = toolList; t != nullptr; t = t->Next())
 	{
-		buf.catf("M1811 T%d P%d\n", t->Number(), t->head != nullptr ? t->head->GetNumber() : -1);
+		buf.catf("T%d H%d\n", t->Number(), t->GetHeadNumber());
 	}
 
 	return f->Write(buf.c_str());
@@ -2759,7 +2821,17 @@ bool RepRap::WriteSelectedPad(FileStore *f) const
 	String<FormatStringLength> buf;
 
 	buf.copy("; Restore selected pad\n");
-	buf.catf("M1821 P%d\n", GetCurrentPad() != nullptr ? GetCurrentPad()->GetNumber() : -1);
+	buf.catf("P%d\n", GetCurrentPadNumber());
+
+	return f->Write(buf.c_str());
+}
+
+bool RepRap::WriteSelectedTool(FileStore *f) const
+{
+	String<FormatStringLength> buf;
+
+	buf.copy("; Restore selected tool\n");
+	buf.catf("T%d\n", GetCurrentToolNumber());
 
 	return f->Write(buf.c_str());
 }

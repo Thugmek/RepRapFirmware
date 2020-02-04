@@ -100,7 +100,11 @@ void Network::Init()
 #endif
 
 #if defined(DUET_NG)
+#if defined(HAS_WIFI_NETWORKING)
+	interfaces[0] = static_cast<NetworkInterface*>(new W5500Interface(platform));
+#else
 	interfaces[0] = (platform.IsDuetWiFi()) ? static_cast<NetworkInterface*>(new WiFiInterface(platform)) : static_cast<NetworkInterface*>(new W5500Interface(platform));
+#endif
 #endif
 
 	// Create the responders
