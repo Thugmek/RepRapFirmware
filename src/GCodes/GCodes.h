@@ -160,6 +160,7 @@ public:
 	bool IsDaemonBusy() const;											// Return true if the daemon is busy running config.g or a trigger file
 
 	bool RunAccessoryParametersFile(const char* fileName);
+	bool RunHeadDefinitionFile(const char* fileName);
 
 	bool IsAxisHomed(unsigned int axis) const							// Has the axis been homed?
 		{ return IsBitSet(axesHomed, axis); }

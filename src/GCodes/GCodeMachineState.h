@@ -94,6 +94,10 @@ enum class GCodeState : uint8_t
 	waitingForPalette2_2,
 
 	waitingForTrilabControllerResponse,
+
+	readingHeadDefinition1,
+	readingHeadDefinition2,
+	readingHeadDefinition3,
 };
 
 // Class to hold the state of gcode execution for some input source
@@ -126,7 +130,8 @@ public:
 		waitingForAcknowledgement : 1,
 		messageAcknowledged : 1,
 		messageCancelled : 1,
-		runningInitializeAccessories : 1;
+		runningInitializeAccessories : 1,
+		runningHeadDefinition : 1;
 
 	static GCodeMachineState *Allocate()
 	post(!result.IsLive(); result.state == GCodeState::normal);

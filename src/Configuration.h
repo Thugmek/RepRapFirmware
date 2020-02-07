@@ -309,7 +309,7 @@ constexpr unsigned int MaxTriggers = 16;				// Must be <= 32 because we store a 
 constexpr float NOZZLE_DIAMETER = 0.5;					// Millimetres
 constexpr float FILAMENT_WIDTH = 1.75;					// Millimetres
 
-constexpr unsigned int MaxStackDepth = 8;				// Maximum depth of stack
+constexpr unsigned int MaxStackDepth = 10;				// Maximum depth of stack
 
 // CNC and laser support
 constexpr size_t MaxSpindles = 4;						// Maximum number of configurable spindles

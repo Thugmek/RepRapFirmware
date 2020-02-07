@@ -3,6 +3,8 @@
 
 // Load Pins_<platform>.h
 
+#define PLATFORM DuetNG
+
 #if !defined(PLATFORM)
 # if defined(__SAM3X8E__)
 #  if defined(__RADDS__)

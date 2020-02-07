@@ -1032,6 +1032,8 @@ bool GCodeBuffer::PushState()
 	ms->waitWhileCooling = machineState->waitWhileCooling;
 	ms->runningM501 = machineState->runningM501;
 	ms->runningM502 = machineState->runningM502;
+	ms->runningInitializeAccessories = machineState->runningInitializeAccessories;
+	ms->runningHeadDefinition = machineState->runningHeadDefinition;
 	ms->volumetricExtrusion = false;
 	ms->g53Active = false;
 	ms->runningSystemMacro = machineState->runningSystemMacro;

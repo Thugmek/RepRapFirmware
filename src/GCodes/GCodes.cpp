@@ -364,6 +364,12 @@ bool GCodes::RunAccessoryParametersFile(const char* fileName)
 	return DoFileMacro(*trilabDaemonGCode, fileName, false);
 }
 
+bool GCodes::RunHeadDefinitionFile(const char* fileName)
+{
+	// return DoFileMacro(runningConfigFile ? *trilabDaemonGCode : gb, fileName, false, 1031);
+	return DoFileMacro(*trilabDaemonGCode, fileName, false, 1830);
+}
+
 // Copy the feed rate etc. from the daemon to the input channels
 void GCodes::CopyConfigFinalValues(GCodeBuffer& gb)
 {
@@ -693,6 +699,7 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 		if ((gb.MachineState().toolChangeParam & TFreeBit) != 0)
 		{
 			const Tool * const oldTool = reprap.GetCurrentTool();
+			platform.MessageF(BlockingUsbMessage, "0 %d\n", reprap.GetCurrentTool()->GetHeadNumber());
 			if (oldTool != nullptr && AllAxesAreHomed())
 			{
 				String<ShortScratchStringLength> scratchString;
@@ -707,9 +714,11 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 		if (LockMovementAndWaitForStandstill(gb))		// wait for tfree.g to finish executing
 		{
 			const Tool * const oldTool = reprap.GetCurrentTool();
+			platform.MessageF(BlockingUsbMessage, "1 %d\n", reprap.GetCurrentTool()->GetHeadNumber());
 			if (oldTool != nullptr)
 			{
 				reprap.StandbyTool(oldTool->Number(), simulationMode != 0);
+				platform.MessageF(BlockingUsbMessage, "2 %d\n", reprap.GetCurrentTool()->GetHeadNumber());
 			}
 			gb.AdvanceState();
 			if (reprap.GetTool(gb.MachineState().newToolNumber) != nullptr && AllAxesAreHomed() && (gb.MachineState().toolChangeParam & TPreBit) != 0)
@@ -725,6 +734,7 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 	case GCodeState::m109ToolChange2:	// Select the new tool (even if it doesn't exist - that just deselects all tools) and run tpost
 		if (LockMovementAndWaitForStandstill(gb))		// wait for tpre.g to finish executing
 		{
+			platform.MessageF(BlockingUsbMessage, "4 %d\n", reprap.GetCurrentTool()->GetHeadNumber());
 			reprap.SelectTool(gb.MachineState().newToolNumber, simulationMode != 0);
 			UpdateCurrentUserPosition();					// get the actual position of the new tool
 
@@ -1631,6 +1641,20 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 
 			reply.copy("No response from Trilab controller");
 			error = true;
+			gb.SetState(GCodeState::normal);
+		}
+		break;
+
+	case GCodeState::readingHeadDefinition1:
+		if (trilabDaemonGCode->MachineState().runningHeadDefinition)
+		{
+			gb.SetState(GCodeState::readingHeadDefinition2);
+		}
+		break;
+
+	case GCodeState::readingHeadDefinition2:
+		if (not trilabDaemonGCode->MachineState().runningHeadDefinition)
+		{
 			gb.SetState(GCodeState::normal);
 		}
 		break;
@@ -3449,6 +3473,7 @@ bool GCodes::DoFileMacro(GCodeBuffer& gb, const char* fileName, bool reportMissi
 	gb.MachineState().runningM501 = (codeRunning == 501);
 	gb.MachineState().runningM502 = (codeRunning == 502);
 	gb.MachineState().runningInitializeAccessories = (codeRunning == 1802);
+	gb.MachineState().runningHeadDefinition = (codeRunning == 1830);
 	if (codeRunning != 98)
 	{
 		gb.MachineState().runningSystemMacro = true;	// running a system macro e.g. homing or tool change, so don't use workplace coordinates

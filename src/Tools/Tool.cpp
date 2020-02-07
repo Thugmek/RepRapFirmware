@@ -118,6 +118,7 @@ Tool * Tool::freelist = nullptr;
 	t->heaterFault = false;
 	t->axisOffsetsProbed = 0;
 	t->displayColdExtrudeWarning = false;
+	t->head = nullptr;
 
 	for (size_t axis = 0; axis < MaxAxes; axis++)
 	{

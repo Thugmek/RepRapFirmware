@@ -4783,6 +4783,38 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		result = ManagePad(gb, reply);
 		break;
 
+	case 1830: // Define pad
+		{
+			bool seen = false;
+			String<FormatStringLength> fileNameTemplate;
+
+			int h = reprap.GetCurrentHeadNumber();
+
+			fileNameTemplate.printf("config-H%d-", h);
+
+			FileInfo fileInfo;
+			if (platform.GetMassStorage()->FindFirst(DEFAULT_SYS_DIR, fileInfo))
+			{
+				do {
+					if (strncmp(fileInfo.fileName.c_str(), fileNameTemplate.c_str(), fileNameTemplate.strlen()) == 0)
+					{
+						seen = true;
+						break;
+					}
+				} while (platform.GetMassStorage()->FindNext(fileInfo));
+			}
+
+			if (seen)
+			{
+				platform.MessageF(BlockingUsbMessage, "%s\n", fileInfo.fileName.c_str());
+
+				gb.SetState(GCodeState::readingHeadDefinition1);
+
+				RunHeadDefinitionFile(fileInfo.fileName.c_str());
+			}
+		}
+		break;
+
 	default:
 		ForwardToUsb(gb);
 

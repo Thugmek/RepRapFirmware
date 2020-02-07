@@ -335,6 +335,9 @@ void RepRap::Init()
 	NVIC_EnableIRQ(HSMCI_IRQn);
 # endif
 #endif
+
+	InitAccessories();
+
 	platform->MessageF(UsbMessage, "%s is up and running.\n", FIRMWARE_NAME);
 
 	fastLoop = UINT32_MAX;
@@ -745,8 +748,11 @@ void RepRap::SelectTool(int toolNumber, bool simulating)
 		}
 	}
 
+
 	if (currentTool == nullptr || newTool == nullptr || currentTool->GetHeadNumber() != newTool->GetHeadNumber())
 	{
+		platform->MessageF(BlockingUsbMessage, "%d, %d\n", currentTool->GetHeadNumber(), newTool->GetHeadNumber());
+
 		SetAccessoryInitialized(false);
 	}
 
@@ -777,10 +783,10 @@ void RepRap::StandbyTool(int toolNumber, bool simulating)
 		{
 			tool->Standby();
 		}
-  		if (currentTool == tool)
-		{
-			currentTool = nullptr;
-		}
+  		// if (currentTool == tool)
+		// {
+		//  	currentTool = nullptr;
+		// }
 	}
 	else
 	{
@@ -902,10 +908,10 @@ void RepRap::SelectHead(Tool* tool, Head* head)
 		tool->SetHead(head);
 	}
 
-	SetAccessoryInitialized(false);
-
-	if (head == GetCurrentHead())
+	if (tool == GetCurrentTool())
 	{
+		SetAccessoryInitialized(false);
+
 		platform->ReadAccessoryParameters();
 	}
 }
@@ -1063,6 +1069,45 @@ void RepRap::SetAccessoryInitialized(const bool initialized)
 bool RepRap::GetAccessoryInitialized() const
 {
 	return accessoryInitialized;
+}
+
+void RepRap::InitAccessories()
+{
+	String<ShortScratchStringLength> reply;
+
+	MutexLocker lock1(headListMutex);
+	if (headList == nullptr)
+	{
+		String<ToolNameLength> name;
+		name.copy("Head 0");
+
+		Head* const head = Head::Create(0, name.c_str(), reply.GetRef());
+		if (head != nullptr)
+		{
+			reprap.AddHead(head);
+
+			MutexLocker lock(toolListMutex);
+			for (Tool *t = toolList; t != nullptr; t = t->Next())
+			{
+				t->SetHead(head);
+			}
+		}
+	}
+
+	MutexLocker lock2(padListMutex);
+	if (padList == nullptr)
+	{
+		String<PadNameLength> name;
+		name.copy("Pad 0");
+
+		Pad* const pad = Pad::Create(0, name.c_str(), reply.GetRef());
+		if (pad != nullptr)
+		{
+			reprap.AddPad(pad);
+
+			SelectPad(pad);
+		}
+	}
 }
 
 void RepRap::Tick()

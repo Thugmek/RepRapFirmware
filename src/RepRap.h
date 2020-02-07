@@ -112,6 +112,8 @@ public:
 	void SetAccessoryInitialized(const bool initialized);
 	bool GetAccessoryInitialized() const;
 
+	void InitAccessories();
+
 	unsigned int GetProhibitedExtruderMovements(unsigned int extrusions, unsigned int retractions);
 	void PrintTool(int toolNumber, const StringRef& reply) const;
 	void FlagTemperatureFault(int8_t dudHeater);
