@@ -2920,16 +2920,16 @@ bool Platform::WritePlatformParameters(FileStore *f, bool includingG31) const
 	return ok;
 }
 
-bool Platform::ReadAccessoryParameters()
+bool Platform::ReadAccessoryConfig()
 {
 	String<MaxFilenameLength> filename;
 
 	int h = reprap.GetCurrentHeadNumber();
 	int p = reprap.GetCurrentPadNumber();
 
-	filename.printf(ACCESSORY_PARAMETERS_FILE, h, p);
+	filename.printf(ACCESSORY_CONFIG_FILE, h, p);
 
-	bool exists = reprap.GetGCodes().RunAccessoryParametersFile(filename.c_str());
+	bool exists = reprap.GetGCodes().RunAccessoryConfigFile(filename.c_str());
 	if (!exists)
 	{
 		SetZProbeDefaults();

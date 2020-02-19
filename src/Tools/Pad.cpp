@@ -22,7 +22,7 @@
 Pad * Pad::freelist = nullptr;
 
 // Create a new tool and return a pointer to it. If an error occurs, put an error message in 'reply' and return nullptr.
-/*static*/ Pad *Pad::Create(unsigned int padNumber, const char *name, const StringRef& reply)
+/*static*/ Pad *Pad::Create(unsigned int padNumber, const char *name, const char *configFileName, const StringRef& reply)
 {
 	Pad *p;
 	{
@@ -39,6 +39,8 @@ Pad * Pad::freelist = nullptr;
 		p = new Pad;
 	}
 
+	p->number = (uint16_t)padNumber;
+
 	const size_t nameLength = strlen(name);
 	if (nameLength != 0)
 	{
@@ -51,8 +53,23 @@ Pad * Pad::freelist = nullptr;
 		p->name = nullptr;
 	}
 
+	const size_t configFileNameLength = strlen(configFileName);
+	if (configFileNameLength != 0)
+	{
+		char *padConfigFileName = new char[configFileNameLength + 1];
+		SafeStrncpy(padConfigFileName, configFileName, configFileNameLength + 1);
+		p->configFileName = padConfigFileName;
+	}
+	else
+	{
+		const size_t defaultConfigFileNameLength = strlen(PAD_DEFAULT_CONFIG_FILE);
+
+		char *padConfigFileName = new char[defaultConfigFileNameLength + 1];
+		SafeStrncpy(padConfigFileName, PAD_DEFAULT_CONFIG_FILE, defaultConfigFileNameLength + 1);
+		p->configFileName = padConfigFileName;
+	}
+
 	p->next = nullptr;
-	p->number = (uint16_t)padNumber;
 
 	return p;
 }
@@ -83,7 +100,7 @@ bool Pad::WriteSettings(FileStore *f) const
 
 	if (ok)
 	{
-		ok = buf.printf("M1820 P%d S\"%s\"", number, name);
+		ok = buf.printf("M1820 P%d S\"%s\" C\"%s\"", number, name, configFileName);
 	}
 
 	buf.cat('\n');
@@ -94,11 +111,7 @@ bool Pad::WriteSettings(FileStore *f) const
 
 void Pad::Print(const StringRef& reply) const
 {
-	reply.printf("Pad %u - ", number);
-	if (name != nullptr)
-	{
-		reply.catf("name: %s; ", name);
-	}
+	reply.printf("Pad %u - name: %s, config: %s", number, GetName(), GetConfigFileName());
 }
 
 // End

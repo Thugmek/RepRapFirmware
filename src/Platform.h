@@ -502,7 +502,7 @@ public:
 	void SetZProbeParameters(ZProbeType probeType, const struct ZProbe& params);
 	bool HomingZWithProbe() const;
 	bool WritePlatformParameters(FileStore *f, bool includingG31) const;
-	bool ReadAccessoryParameters();
+	bool ReadAccessoryConfig();
 	bool WriteZProbeParameters(FileStore *f) const;
 	void SetProbing(bool isProbing);
 	GCodeResult ProgramZProbe(GCodeBuffer& gb, const StringRef& reply);

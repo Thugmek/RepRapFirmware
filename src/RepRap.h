@@ -89,7 +89,7 @@ public:
 
 	void AddHead(Head* head);
 	void DeleteHead(Head* h);
-	void SelectHead(Tool* tool, Head* head);
+	void SelectHead(GCodeBuffer& gb, Tool* tool, Head* head);
 	Head* GetHead(int headNumber) const;
 	void PrintHead(int headNumber, const StringRef& reply) const;
 	void PrintHeads(const StringRef& reply) const;

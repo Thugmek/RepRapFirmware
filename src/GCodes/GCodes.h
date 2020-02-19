@@ -159,8 +159,8 @@ public:
 	bool RunConfigFile(const char* fileName);							// Start running the config file
 	bool IsDaemonBusy() const;											// Return true if the daemon is busy running config.g or a trigger file
 
-	bool RunAccessoryParametersFile(const char* fileName);
-	bool RunHeadDefinitionFile(const char* fileName);
+	bool RunHeadConfigFile(GCodeBuffer& gb, Tool* tool, Head* head);
+	bool RunAccessoryConfigFile(const char* fileName);
 
 	bool IsAxisHomed(unsigned int axis) const							// Has the axis been homed?
 		{ return IsBitSet(axesHomed, axis); }
@@ -279,7 +279,7 @@ private:
 	void StartNextGCode(GCodeBuffer& gb, const StringRef& reply);		// Fetch a new or old GCode and process it
 	void RunStateMachine(GCodeBuffer& gb, const StringRef& reply);		// Execute a step of the state machine
 	void DoFilePrint(GCodeBuffer& gb, const StringRef& reply);			// Get G Codes from a file and print them
-	bool DoFileMacro(GCodeBuffer& gb, const char* fileName, bool reportMissing, int codeRunning = 0);
+	bool DoFileMacro(GCodeBuffer& gb, const char* fileName, bool reportMissing, int codeRunning = 0, int intParam = 0);
 																		// Run a GCode macro file, optionally report error if not found
 	void FileMacroCyclesReturn(GCodeBuffer& gb);						// End a macro
 

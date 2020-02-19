@@ -358,16 +358,44 @@ bool GCodes::IsDaemonBusy() const
 	return daemonGCode->MachineState().fileState.IsLive();
 }
 
-bool GCodes::RunAccessoryParametersFile(const char* fileName)
+bool GCodes::RunHeadConfigFile(GCodeBuffer& gb, Tool* tool, Head* head)
 {
-	// return DoFileMacro(runningConfigFile ? *trilabDaemonGCode : gb, fileName, false, 1031);
-	return DoFileMacro(*trilabDaemonGCode, fileName, false);
+	/*
+	String<FormatStringLength> fileNameTemplate;
+	fileNameTemplate.printf(HEAD_CONFIG_FILE_TEMPLATE, head->GetNumber());
+
+	bool seen = false;
+	FileInfo fileInfo;
+	if (platform.GetMassStorage()->FindFirst(DEFAULT_SYS_DIR, fileInfo))
+	{
+		do {
+			if (strncmp(fileInfo.fileName.c_str(), fileNameTemplate.c_str(), fileNameTemplate.strlen()) == 0)
+			{
+				seen = true;
+
+				platform.GetMassStorage()->AbandonFindNext();
+				break;
+			}
+		} while (platform.GetMassStorage()->FindNext(fileInfo));
+	}
+
+	if (seen)
+	{
+		return DoFileMacro(gb, fileInfo.fileName.c_str(), true, 1830, tool->Number());
+	}
+	else
+	{
+		return false;
+	}
+
+	*/
+
+	return DoFileMacro(gb, head->GetConfigFileName(), true, 1830, tool->Number());
 }
 
-bool GCodes::RunHeadDefinitionFile(const char* fileName)
+bool GCodes::RunAccessoryConfigFile(const char* fileName)
 {
-	// return DoFileMacro(runningConfigFile ? *trilabDaemonGCode : gb, fileName, false, 1031);
-	return DoFileMacro(*trilabDaemonGCode, fileName, false, 1830);
+	return DoFileMacro(*trilabDaemonGCode, fileName, false);
 }
 
 // Copy the feed rate etc. from the daemon to the input channels
@@ -678,7 +706,7 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 
 					// SendTrilabControlerRequest(gb, 100, buf.c_str(), true);
 
-					platform.ReadAccessoryParameters();
+					platform.ReadAccessoryConfig();
 
 	                gb.SetState(GCodeState::normal);
 				}
@@ -699,7 +727,6 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 		if ((gb.MachineState().toolChangeParam & TFreeBit) != 0)
 		{
 			const Tool * const oldTool = reprap.GetCurrentTool();
-			platform.MessageF(BlockingUsbMessage, "0 %d\n", reprap.GetCurrentTool()->GetHeadNumber());
 			if (oldTool != nullptr && AllAxesAreHomed())
 			{
 				String<ShortScratchStringLength> scratchString;
@@ -714,11 +741,9 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 		if (LockMovementAndWaitForStandstill(gb))		// wait for tfree.g to finish executing
 		{
 			const Tool * const oldTool = reprap.GetCurrentTool();
-			platform.MessageF(BlockingUsbMessage, "1 %d\n", reprap.GetCurrentTool()->GetHeadNumber());
 			if (oldTool != nullptr)
 			{
 				reprap.StandbyTool(oldTool->Number(), simulationMode != 0);
-				platform.MessageF(BlockingUsbMessage, "2 %d\n", reprap.GetCurrentTool()->GetHeadNumber());
 			}
 			gb.AdvanceState();
 			if (reprap.GetTool(gb.MachineState().newToolNumber) != nullptr && AllAxesAreHomed() && (gb.MachineState().toolChangeParam & TPreBit) != 0)
@@ -734,7 +759,6 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 	case GCodeState::m109ToolChange2:	// Select the new tool (even if it doesn't exist - that just deselects all tools) and run tpost
 		if (LockMovementAndWaitForStandstill(gb))		// wait for tpre.g to finish executing
 		{
-			platform.MessageF(BlockingUsbMessage, "4 %d\n", reprap.GetCurrentTool()->GetHeadNumber());
 			reprap.SelectTool(gb.MachineState().newToolNumber, simulationMode != 0);
 			UpdateCurrentUserPosition();					// get the actual position of the new tool
 
@@ -1641,20 +1665,6 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 
 			reply.copy("No response from Trilab controller");
 			error = true;
-			gb.SetState(GCodeState::normal);
-		}
-		break;
-
-	case GCodeState::readingHeadDefinition1:
-		if (trilabDaemonGCode->MachineState().runningHeadDefinition)
-		{
-			gb.SetState(GCodeState::readingHeadDefinition2);
-		}
-		break;
-
-	case GCodeState::readingHeadDefinition2:
-		if (not trilabDaemonGCode->MachineState().runningHeadDefinition)
-		{
 			gb.SetState(GCodeState::normal);
 		}
 		break;
@@ -3434,7 +3444,7 @@ void GCodes::EmergencyStop()
 // 502 = running M502
 // 98 = running a macro explicitly via M98
 // 0 = running a system macro automatically
-bool GCodes::DoFileMacro(GCodeBuffer& gb, const char* fileName, bool reportMissing, int codeRunning)
+bool GCodes::DoFileMacro(GCodeBuffer& gb, const char* fileName, bool reportMissing, int codeRunning, int intParam)
 {
 	String<StringLength20> toolSpecFileName;
 
@@ -3469,11 +3479,13 @@ bool GCodes::DoFileMacro(GCodeBuffer& gb, const char* fileName, bool reportMissi
 	}
 	gb.MachineState().fileState.Set(f);
 	fileInput->Reset(gb.MachineState().fileState);
+	gb.MachineState().macroIntParam0 = intParam;
 	gb.MachineState().doingFileMacro = true;
 	gb.MachineState().runningM501 = (codeRunning == 501);
 	gb.MachineState().runningM502 = (codeRunning == 502);
 	gb.MachineState().runningInitializeAccessories = (codeRunning == 1802);
 	gb.MachineState().runningHeadDefinition = (codeRunning == 1830);
+
 	if (codeRunning != 98)
 	{
 		gb.MachineState().runningSystemMacro = true;	// running a system macro e.g. homing or tool change, so don't use workplace coordinates
@@ -3932,10 +3944,18 @@ GCodeResult GCodes::SetOrReportOffsets(GCodeBuffer &gb, const StringRef& reply)
 	Tool *tool;
 	if (gb.Seen('P'))
 	{
-		int toolNumber = gb.GetIValue();
-		toolNumber += gb.GetToolNumberAdjust();
-		tool = reprap.GetTool(toolNumber);
+		int toolNumber;
+		if (gb.MachineState().runningHeadDefinition)
+		{
+			toolNumber = gb.MachineState().macroIntParam0;
+		}
+		else
+		{
+			toolNumber = gb.GetIValue();
+			toolNumber += gb.GetToolNumberAdjust();
+		}
 
+		tool = reprap.GetTool(toolNumber);
 		if (tool == nullptr)
 		{
 			reply.printf("Attempt to set/report offsets and temperatures for non-existent tool: %d", toolNumber);
@@ -4172,27 +4192,8 @@ GCodeResult GCodes::ManageHead(GCodeBuffer& gb, const StringRef& reply)
 	{
 		const unsigned int headNumber = gb.GetUIValue();
 
-		// Check head name
-		String<ToolNameLength> name;
-		if (gb.Seen('S'))
-		{
-			if (!gb.GetQuotedString(name.GetRef()))
-			{
-				reply.copy("Invalid head name");
-				return GCodeResult::error;
-			}
-			seen = true;
-		}
-
-		int t = 0;
-		if (gb.Seen('T'))
-		{
-			t = gb.GetIValue();
-
-			seen = true;
-		}
-
-		if (seen)
+		// Delete
+		if (gb.Seen('D'))
 		{
 			if (!LockMovementAndWaitForStandstill(gb))
 			{
@@ -4201,17 +4202,53 @@ GCodeResult GCodes::ManageHead(GCodeBuffer& gb, const StringRef& reply)
 
 			// Add or delete tool, so start by deleting the old one with this number, if any
 			reprap.DeleteHead(reprap.GetHead(headNumber));
-
-			Head* const head = Head::Create(headNumber, name.c_str(), reply);
-			if (head == nullptr)
-			{
-				return GCodeResult::error;
-			}
-			reprap.AddHead(head);
 		}
 		else
 		{
-			reprap.PrintHead(headNumber, reply);
+			// Check head name
+			String<HeadNameLength> name;
+			if (gb.Seen('S'))
+			{
+				if (!gb.GetQuotedString(name.GetRef()))
+				{
+					reply.copy("Invalid head name");
+					return GCodeResult::error;
+				}
+				seen = true;
+			}
+
+			String<HeadConfigFileNameLength> configFileName;
+			if (gb.Seen('C'))
+			{
+				if (!gb.GetQuotedString(configFileName.GetRef()))
+				{
+					reply.copy("Invalid head config filename");
+					return GCodeResult::error;
+				}
+				seen = true;
+			}
+
+			if (seen)
+			{
+				if (!LockMovementAndWaitForStandstill(gb))
+				{
+					return GCodeResult::notFinished;
+				}
+
+				// Add or delete tool, so start by deleting the old one with this number, if any
+				reprap.DeleteHead(reprap.GetHead(headNumber));
+
+				Head* const head = Head::Create(headNumber, name.c_str(), configFileName.c_str(), reply);
+				if (head == nullptr)
+				{
+					return GCodeResult::error;
+				}
+				reprap.AddHead(head);
+			}
+			else
+			{
+				reprap.PrintHead(headNumber, reply);
+			}
 		}
 	}
 	else
@@ -4231,27 +4268,8 @@ GCodeResult GCodes::ManagePad(GCodeBuffer& gb, const StringRef& reply)
 	{
 		const unsigned int padNumber = gb.GetUIValue();
 
-		// Check head name
-		String<PadNameLength> name;
-		if (gb.Seen('S'))
-		{
-			if (!gb.GetQuotedString(name.GetRef()))
-			{
-				reply.copy("Invalid pad name");
-				return GCodeResult::error;
-			}
-			seen = true;
-		}
-
-		int t = 0;
-		if (gb.Seen('T'))
-		{
-			t = gb.GetIValue();
-
-			seen = true;
-		}
-
-		if (seen)
+		// Delete
+		if (gb.Seen('D'))
 		{
 			if (!LockMovementAndWaitForStandstill(gb))
 			{
@@ -4260,17 +4278,53 @@ GCodeResult GCodes::ManagePad(GCodeBuffer& gb, const StringRef& reply)
 
 			// Add or delete tool, so start by deleting the old one with this number, if any
 			reprap.DeletePad(reprap.GetPad(padNumber));
-
-			Pad* const pad = Pad::Create(padNumber, name.c_str(), reply);
-			if (pad == nullptr)
-			{
-				return GCodeResult::error;
-			}
-			reprap.AddPad(pad);
 		}
 		else
 		{
-			reprap.PrintPad(padNumber, reply);
+			// Check head name
+			String<PadNameLength> name;
+			if (gb.Seen('S'))
+			{
+				if (!gb.GetQuotedString(name.GetRef()))
+				{
+					reply.copy("Invalid pad name");
+					return GCodeResult::error;
+				}
+				seen = true;
+			}
+
+			String<PadConfigFileNameLength> configFileName;
+			if (gb.Seen('C'))
+			{
+				if (!gb.GetQuotedString(configFileName.GetRef()))
+				{
+					reply.copy("Invalid pad config filename");
+					return GCodeResult::error;
+				}
+				seen = true;
+			}
+
+			if (seen)
+			{
+				if (!LockMovementAndWaitForStandstill(gb))
+				{
+					return GCodeResult::notFinished;
+				}
+
+				// Add or delete tool, so start by deleting the old one with this number, if any
+				reprap.DeletePad(reprap.GetPad(padNumber));
+
+				Pad* const pad = Pad::Create(padNumber, name.c_str(), configFileName.c_str(), reply);
+				if (pad == nullptr)
+				{
+					return GCodeResult::error;
+				}
+				reprap.AddPad(pad);
+			}
+			else
+			{
+				reprap.PrintPad(padNumber, reply);
+			}
 		}
 	}
 	else
@@ -4532,9 +4586,19 @@ void GCodes::HandleReply(GCodeBuffer& gb, OutputBuffer *reply)
 // Configure heater protection (M143). Returns true if an error occurred
 GCodeResult GCodes::SetHeaterProtection(GCodeBuffer& gb, const StringRef& reply)
 {
-	const int index = (gb.Seen('P'))
-						? gb.GetIValue()
-						: (gb.Seen('H')) ? gb.GetIValue() : 1;		// default to extruder 1 if no heater number provided
+	int index = 1;
+	if (gb.Seen('P') or gb.Seen('H'))
+	{
+		if (gb.MachineState().runningHeadDefinition)
+		{
+			index = reprap.GetTool(gb.MachineState().macroIntParam0)->Heater(0);
+		}
+		else
+		{
+			index = (gb.Seen('P')) ? gb.GetIValue() : (gb.Seen('H')) ? gb.GetIValue() : 1; // default to extruder 1 if no heater number provided
+		}
+	}
+
 	if ((index < 0 || index >= (int)NumHeaters) && (index < (int)FirstExtraHeaterProtection || index >= (int)(FirstExtraHeaterProtection + NumExtraHeaterProtections)))
 	{
 		reply.printf("Invalid heater protection item '%d'", index);
@@ -4700,7 +4764,16 @@ GCodeResult GCodes::SetHeaterParameters(GCodeBuffer& gb, const StringRef& reply)
 {
 	if (gb.Seen('P'))
 	{
-		const int heater = gb.GetIValue();
+		int heater;
+		if (gb.MachineState().runningHeadDefinition)
+		{
+			heater = reprap.GetTool(gb.MachineState().macroIntParam0)->Heater(0);
+		}
+		else
+		{
+			heater = gb.GetIValue();
+		}
+
 		if ((heater >= 0 && heater < (int)NumHeaters) || (heater >= (int)FirstVirtualHeater && heater < (int)(FirstVirtualHeater + MaxVirtualHeaters)))
 		{
 			Heat& heat = reprap.GetHeat();
@@ -5440,7 +5513,7 @@ GCodeResult GCodes::WriteConfigOverrideFile(GCodeBuffer& gb, const StringRef& re
 		int h = reprap.GetCurrentHeadNumber();
 		int p = reprap.GetCurrentPadNumber();
 
-		fn.printf(ACCESSORY_PARAMETERS_FILE, h, p);
+		fn.printf(ACCESSORY_CONFIG_FILE, h, p);
 		FileStore * const f = platform.OpenSysFile(fn.c_str(), OpenMode::write);
 		if (f == nullptr)
 		{

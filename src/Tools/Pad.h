@@ -19,17 +19,19 @@ Licence: GPL
 #include "RepRapFirmware.h"
 
 constexpr size_t PadNameLength = 32;						// maximum allowed length for head names
+constexpr size_t PadConfigFileNameLength = 32;				// maximum allowed length for head config filename
 
 class Pad
 {
 public:
 
-	static Pad *Create(unsigned int padNumber, const char *name, const StringRef& reply);
+	static Pad *Create(unsigned int padNumber, const char *name, const char *configFileName, const StringRef& reply);
 	static void Delete(Pad *p);
 	Pad *Next() const { return next; }
 
-	const char *GetName() const;
 	int GetNumber() const;
+	const char *GetName() const;
+	const char *GetConfigFileName() const;
 
 	friend class RepRap;
 
@@ -42,21 +44,27 @@ protected:
 private:
 	static Pad *freelist;
 
-	Pad() : next(nullptr), name(nullptr) { }
+	Pad() : next(nullptr), name(nullptr), configFileName(nullptr) { }
 
 	Pad* next;
-	const char *name;
 	int number;
+	const char *name;
+	const char *configFileName;
 };
+
+inline int Pad::GetNumber() const
+{
+	return number;
+}
 
 inline const char *Pad::GetName() const
 {
 	return (name == nullptr) ? "" : name;
 }
 
-inline int Pad::GetNumber() const
+inline const char *Pad::GetConfigFileName() const
 {
-	return number;
+	return (configFileName == nullptr) ? PAD_DEFAULT_CONFIG_FILE : configFileName;
 }
 
 #endif /* PAD_H_ */

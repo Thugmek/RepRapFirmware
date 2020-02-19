@@ -751,14 +751,12 @@ void RepRap::SelectTool(int toolNumber, bool simulating)
 
 	if (currentTool == nullptr || newTool == nullptr || currentTool->GetHeadNumber() != newTool->GetHeadNumber())
 	{
-		platform->MessageF(BlockingUsbMessage, "%d, %d\n", currentTool->GetHeadNumber(), newTool->GetHeadNumber());
-
 		SetAccessoryInitialized(false);
 	}
 
 	currentTool = newTool;
 
-	platform->ReadAccessoryParameters();
+	platform->ReadAccessoryConfig();
 }
 
 void RepRap::PrintTool(int toolNumber, const StringRef& reply) const
@@ -901,7 +899,7 @@ Head* RepRap::GetHead(int headNumber) const
 	return nullptr; // Not an error
 }
 
-void RepRap::SelectHead(Tool* tool, Head* head)
+void RepRap::SelectHead(GCodeBuffer& gb, Tool* tool, Head* head)
 {
 	if (tool != nullptr)
 	{
@@ -912,8 +910,10 @@ void RepRap::SelectHead(Tool* tool, Head* head)
 	{
 		SetAccessoryInitialized(false);
 
-		platform->ReadAccessoryParameters();
+		platform->ReadAccessoryConfig();
 	}
+
+	gCodes->RunHeadConfigFile(gb, tool, head);
 }
 
 void RepRap::PrintHead(int headNumber, const StringRef& reply) const
@@ -1000,7 +1000,7 @@ void RepRap::SelectPad(Pad* pad)
 
 	SetAccessoryInitialized(false);
 
-	platform->ReadAccessoryParameters();
+	platform->ReadAccessoryConfig();
 }
 
 Pad* RepRap::GetPad(int padNumber) const
@@ -1078,10 +1078,13 @@ void RepRap::InitAccessories()
 	MutexLocker lock1(headListMutex);
 	if (headList == nullptr)
 	{
-		String<ToolNameLength> name;
+		String<HeadNameLength> name;
 		name.copy("Head 0");
 
-		Head* const head = Head::Create(0, name.c_str(), reply.GetRef());
+		String<HeadConfigFileNameLength> configFileName;
+		configFileName.copy(HEAD_DEFAULT_CONFIG_FILE);
+
+		Head* const head = Head::Create(0, name.c_str(), configFileName.c_str(), reply.GetRef());
 		if (head != nullptr)
 		{
 			reprap.AddHead(head);
@@ -1100,7 +1103,10 @@ void RepRap::InitAccessories()
 		String<PadNameLength> name;
 		name.copy("Pad 0");
 
-		Pad* const pad = Pad::Create(0, name.c_str(), reply.GetRef());
+		String<PadConfigFileNameLength> configFileName;
+		configFileName.copy(PAD_DEFAULT_CONFIG_FILE);
+
+		Pad* const pad = Pad::Create(0, name.c_str(), configFileName.c_str(), reply.GetRef());
 		if (pad != nullptr)
 		{
 			reprap.AddPad(pad);
@@ -1794,6 +1800,11 @@ OutputBuffer *RepRap::GetStatusResponse(uint8_t type, ResponseSource source)
 					response->cat(",\"name\":");
 					response->EncodeString(headName, false);
 				}
+
+				// Config
+				response->cat(",\"config\":");
+				response->EncodeString(head->GetConfigFileName(), false);
+
 		  		// Do we have any more tools?
 				response->cat((head->Next() != nullptr) ? "}," : "}");
 			}
@@ -1817,6 +1828,11 @@ OutputBuffer *RepRap::GetStatusResponse(uint8_t type, ResponseSource source)
 					response->cat(",\"name\":");
 					response->EncodeString(padName, false);
 				}
+
+				// Config
+				response->cat(",\"config\":");
+				response->EncodeString(pad->GetConfigFileName(), false);
+
 		  		// Do we have any more tools?
 				response->cat((pad->Next() != nullptr) ? "}," : "}");
 			}

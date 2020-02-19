@@ -1023,6 +1023,7 @@ bool GCodeBuffer::PushState()
 	GCodeMachineState * const ms = GCodeMachineState::Allocate();
 	ms->previous = machineState;
 	ms->feedRate = machineState->feedRate;
+	ms->macroIntParam0 = machineState->macroIntParam0;
 	ms->fileState.CopyFrom(machineState->fileState);
 	ms->lockedResources = machineState->lockedResources;
 	ms->drivesRelative = machineState->drivesRelative;

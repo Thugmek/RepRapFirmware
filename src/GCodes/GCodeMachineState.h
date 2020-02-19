@@ -115,6 +115,7 @@ public:
 	GCodeState state;
 	uint8_t toolChangeParam;
 	int16_t newToolNumber;
+	int macroIntParam0;
 	unsigned int
 		drivesRelative : 1,
 		axesRelative : 1,

@@ -601,8 +601,6 @@ GCodeResult GCodes::SetOrReportZProbe(GCodeBuffer& gb, const StringRef &reply)
 		params.diveHeight = gb.GetFValue();
 		seen = true;
 
-		platform.MessageF(BlockingUsbMessage, "runningInitializeAccessories %d\n", (int)gb.MachineState().runningInitializeAccessories);
-
 		// Dive height restored to low distance, while initialize accessories macro running -> initialize accessories done
 		if (gb.MachineState().runningInitializeAccessories && params.diveHeight <= 3.0)
 		{
@@ -1471,7 +1469,16 @@ GCodeResult GCodes::SetHeaterModel(GCodeBuffer& gb, const StringRef& reply)
 {
 	if (gb.Seen('H'))
 	{
-		const unsigned int heater = gb.GetUIValue();
+		unsigned int heater;
+		if (gb.MachineState().runningHeadDefinition)
+		{
+			heater = reprap.GetTool(gb.MachineState().macroIntParam0)->Heater(0);
+		}
+		else
+		{
+			heater = gb.GetUIValue();
+		}
+
 		if (heater < NumHeaters)
 		{
 			const FopDt& model = reprap.GetHeat().GetHeaterModel(heater);

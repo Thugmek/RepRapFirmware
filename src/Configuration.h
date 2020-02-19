@@ -364,7 +364,10 @@ constexpr size_t FILE_BUFFER_SIZE = 128;
 #define CONFIG_BACKUP_FILE "config.g.bak"
 #define DEFAULT_LOG_FILE "eventlog.txt"
 #define RESUME_AFTER_POWER_FAIL_FILE "resurrect.g"
-#define ACCESSORY_PARAMETERS_FILE "accessory-parameters-H%d-P%d.g"
+// #define HEAD_CONFIG_FILE_TEMPLATE "config-H%d-"
+#define HEAD_DEFAULT_CONFIG_FILE "config-head-default.g"
+#define PAD_DEFAULT_CONFIG_FILE "config-pad-default.g"
+#define ACCESSORY_CONFIG_FILE "config-accessory-H%d-P%d.g"
 
 #define EOF_STRING "<!-- **EoF** -->"
 

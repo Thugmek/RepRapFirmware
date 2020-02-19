@@ -22,7 +22,7 @@
 Head * Head::freelist = nullptr;
 
 // Create a new tool and return a pointer to it. If an error occurs, put an error message in 'reply' and return nullptr.
-/*static*/ Head *Head::Create(unsigned int headNumber, const char *name, const StringRef& reply)
+/*static*/ Head *Head::Create(unsigned int headNumber, const char *name, const char *configFileName, const StringRef& reply)
 {
 	Head *h;
 	{
@@ -39,6 +39,8 @@ Head * Head::freelist = nullptr;
 		h = new Head;
 	}
 
+	h->number = (uint16_t)headNumber;
+
 	const size_t nameLength = strlen(name);
 	if (nameLength != 0)
 	{
@@ -51,8 +53,23 @@ Head * Head::freelist = nullptr;
 		h->name = nullptr;
 	}
 
+	const size_t configFileNameLength = strlen(configFileName);
+	if (configFileNameLength != 0)
+	{
+		char *headConfigFileName = new char[configFileNameLength + 1];
+		SafeStrncpy(headConfigFileName, configFileName, configFileNameLength + 1);
+		h->configFileName = headConfigFileName;
+	}
+	else
+	{
+		const size_t defaultConfigFileNameLength = strlen(HEAD_DEFAULT_CONFIG_FILE);
+
+		char *headConfigFileName = new char[defaultConfigFileNameLength + 1];
+		SafeStrncpy(headConfigFileName, HEAD_DEFAULT_CONFIG_FILE, defaultConfigFileNameLength + 1);
+		h->configFileName = headConfigFileName;
+	}
+
 	h->next = nullptr;
-	h->number = (uint16_t)headNumber;
 
 	return h;
 }
@@ -83,7 +100,7 @@ bool Head::WriteSettings(FileStore *f) const
 
 	if (ok)
 	{
-		ok = buf.printf("M1810 P%d S\"%s\"", number, name);
+		ok = buf.printf("M1810 P%d S\"%s\" C\"%s\"", number, name, configFileName);
 	}
 
 	buf.cat('\n');
@@ -94,11 +111,7 @@ bool Head::WriteSettings(FileStore *f) const
 
 void Head::Print(const StringRef& reply) const
 {
-	reply.printf("Head %u - ", number);
-	if (name != nullptr)
-	{
-		reply.catf("name: %s; ", name);
-	}
+	reply.printf("Head %u - name: %s, config: %s", number, GetName(), GetConfigFileName());
 }
 
 // End
