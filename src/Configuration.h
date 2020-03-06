@@ -367,6 +367,7 @@ constexpr size_t FILE_BUFFER_SIZE = 128;
 // #define HEAD_CONFIG_FILE_TEMPLATE "config-H%d-"
 #define HEAD_DEFAULT_CONFIG_FILE "config-head-default.g"
 #define PAD_DEFAULT_CONFIG_FILE "config-pad-default.g"
+#define ACCESSORY_DEFAULT_CONFIG_FILE "config-accessory-default.g"
 #define ACCESSORY_CONFIG_FILE "config-accessory-H%d-P%d.g"
 
 #define EOF_STRING "<!-- **EoF** -->"

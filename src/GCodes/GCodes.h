@@ -160,7 +160,10 @@ public:
 	bool IsDaemonBusy() const;											// Return true if the daemon is busy running config.g or a trigger file
 
 	bool RunHeadConfigFile(GCodeBuffer& gb, Tool* tool, Head* head);
+	bool RunPrintpadConfigFile(GCodeBuffer& gb, Pad* pad);
 	bool RunAccessoryConfigFile(const char* fileName);
+
+	bool SaveConfigOverrideFile(GCodeBuffer& gb); 				// Save the config-override file
 
 	bool IsAxisHomed(unsigned int axis) const							// Has the axis been homed?
 		{ return IsBitSet(axesHomed, axis); }
@@ -244,6 +247,8 @@ public:
 #if SUPPORT_WORKPLACE_COORDINATES
 	unsigned int GetWorkplaceCoordinateSystemNumber() const { return currentCoordinateSystem + 1; }
 #endif
+
+	GCodeBuffer& GetTrilabDaemon() { return *trilabDaemonGCode; }
 
 protected:
 	DECLARE_OBJECT_MODEL

@@ -503,6 +503,8 @@ public:
 	bool HomingZWithProbe() const;
 	bool WritePlatformParameters(FileStore *f, bool includingG31) const;
 	bool ReadAccessoryConfig();
+	bool WriteAccessoryConfig();
+	bool MigrateZProbeOffsetFromConfigOverrideToConfigAccessory();
 	bool WriteZProbeParameters(FileStore *f) const;
 	void SetProbing(bool isProbing);
 	GCodeResult ProgramZProbe(GCodeBuffer& gb, const StringRef& reply);

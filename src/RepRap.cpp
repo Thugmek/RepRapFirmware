@@ -994,9 +994,11 @@ void RepRap::DeletePad(Pad* pad)
 	Pad::Delete(pad);
 }
 
-void RepRap::SelectPad(Pad* pad)
+void RepRap::SelectPad(GCodeBuffer& gb, Pad* pad)
 {
 	currentPad = pad;
+
+	gCodes->RunPrintpadConfigFile(gb, pad);
 
 	SetAccessoryInitialized(false);
 
@@ -1079,7 +1081,7 @@ void RepRap::InitAccessories()
 	if (headList == nullptr)
 	{
 		String<HeadNameLength> name;
-		name.copy("Head 0");
+		name.copy("Printhead 0");
 
 		String<HeadConfigFileNameLength> configFileName;
 		configFileName.copy(HEAD_DEFAULT_CONFIG_FILE);
@@ -1101,7 +1103,7 @@ void RepRap::InitAccessories()
 	if (padList == nullptr)
 	{
 		String<PadNameLength> name;
-		name.copy("Pad 0");
+		name.copy("Printpad 0");
 
 		String<PadConfigFileNameLength> configFileName;
 		configFileName.copy(PAD_DEFAULT_CONFIG_FILE);
@@ -1111,7 +1113,7 @@ void RepRap::InitAccessories()
 		{
 			reprap.AddPad(pad);
 
-			SelectPad(pad);
+			SelectPad(gCodes->GetTrilabDaemon(), pad);
 		}
 	}
 }

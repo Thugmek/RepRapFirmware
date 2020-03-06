@@ -2932,10 +2932,62 @@ bool Platform::ReadAccessoryConfig()
 	bool exists = reprap.GetGCodes().RunAccessoryConfigFile(filename.c_str());
 	if (!exists)
 	{
-		SetZProbeDefaults();
+		reprap.GetGCodes().RunAccessoryConfigFile(ACCESSORY_DEFAULT_CONFIG_FILE);
 	}
 
 	return exists;
+}
+
+bool Platform::WriteAccessoryConfig()
+{
+	String<MaxFilenameLength> fn;
+
+	int h = reprap.GetCurrentHeadNumber();
+	int p = reprap.GetCurrentPadNumber();
+
+	fn.printf(ACCESSORY_CONFIG_FILE, h, p);
+	FileStore * const f = OpenSysFile(fn.c_str(), OpenMode::write);
+	if (f == nullptr)
+	{
+		return false;
+	}
+
+	WriteZProbeParameters(f);
+
+	if (!f->Close())
+	{
+		return false;
+	}
+	return true;
+}
+
+bool Platform::MigrateZProbeOffsetFromConfigOverrideToConfigAccessory()
+{
+	String<MaxFilenameLength> fileName;
+
+	int h = 0;
+	int p = 0;
+
+	fileName.printf(ACCESSORY_CONFIG_FILE, h, p);
+
+	FileStore *f = OpenSysFile(fileName.c_str(), OpenMode::read);
+	if (f == nullptr) // file doesnt exist
+	{
+		f = OpenSysFile(fileName.c_str(), OpenMode::write);
+		if (f == nullptr)
+		{
+			return false;
+		}
+
+		WriteZProbeParameters(f);
+	}
+
+	if (!f->Close())
+	{
+		return false;
+	}
+
+	return true;
 }
 
 bool Platform::WriteZProbeParameters(FileStore *f) const

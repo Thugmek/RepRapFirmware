@@ -4852,6 +4852,8 @@ bool GCodes::HandleTcode(GCodeBuffer& gb, const StringRef& reply)
 				if (tool != nullptr)
 				{
 					reprap.SelectHead(gb, tool, head);
+
+					SaveConfigOverrideFile(gb);
 				}
 				else
 				{
@@ -4922,7 +4924,7 @@ bool GCodes::HandleHcode(GCodeBuffer& gb, const StringRef& reply)
 	int headNumber;
 	if (gb.HasCommandNumber())
 	{
-		headNumber = gb.GetIValue();
+		headNumber = gb.GetCommandNumber();
 		Head* const head = reprap.GetHead(headNumber);
 		if (head != nullptr or headNumber == -1)
 		{
@@ -4930,6 +4932,8 @@ bool GCodes::HandleHcode(GCodeBuffer& gb, const StringRef& reply)
 			if (tool != nullptr)
 			{
 				reprap.SelectHead(gb, tool, head);
+
+				SaveConfigOverrideFile(gb);
 			}
 			else
 			{
@@ -4968,7 +4972,9 @@ bool GCodes::HandlePcode(GCodeBuffer& gb, const StringRef& reply)
 		Pad* const pad = reprap.GetPad(padNumber);
 		if (pad != nullptr or padNumber == -1)
 		{
-			reprap.SelectPad(pad);
+			reprap.SelectPad(gb, pad);
+
+			SaveConfigOverrideFile(gb);
 		}
 		else
 		{

@@ -393,9 +393,25 @@ bool GCodes::RunHeadConfigFile(GCodeBuffer& gb, Tool* tool, Head* head)
 	return DoFileMacro(gb, head->GetConfigFileName(), true, 1830, tool->Number());
 }
 
+bool GCodes::RunPrintpadConfigFile(GCodeBuffer& gb, Pad* pad)
+{
+	return DoFileMacro(gb, pad->GetConfigFileName(), true, 1831);
+}
+
 bool GCodes::RunAccessoryConfigFile(const char* fileName)
 {
 	return DoFileMacro(*trilabDaemonGCode, fileName, false);
+}
+
+bool GCodes::SaveConfigOverrideFile(GCodeBuffer& gb)
+{
+	if (!reprap.IsProcessingConfig() && !runningConfigFile && !gb.MachineState().runningM501 && !gb.MachineState().runningM502)
+	{
+		String<GCodeReplyLength> reply;
+
+		return WriteConfigOverrideFile(gb, reply.GetRef()) == GCodeResult::ok;
+	}
+	return false;
 }
 
 // Copy the feed rate etc. from the daemon to the input channels
@@ -792,6 +808,8 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 			if (gb.GetState() == GCodeState::toolChangeComplete)
 			{
 				gb.SetState(GCodeState::normal);
+
+				SaveConfigOverrideFile(gb);
 			}
 			else
 			{
@@ -4202,6 +4220,8 @@ GCodeResult GCodes::ManageHead(GCodeBuffer& gb, const StringRef& reply)
 
 			// Add or delete tool, so start by deleting the old one with this number, if any
 			reprap.DeleteHead(reprap.GetHead(headNumber));
+
+			SaveConfigOverrideFile(gb);
 		}
 		else
 		{
@@ -4244,6 +4264,8 @@ GCodeResult GCodes::ManageHead(GCodeBuffer& gb, const StringRef& reply)
 					return GCodeResult::error;
 				}
 				reprap.AddHead(head);
+
+				SaveConfigOverrideFile(gb);
 			}
 			else
 			{
@@ -4278,6 +4300,8 @@ GCodeResult GCodes::ManagePad(GCodeBuffer& gb, const StringRef& reply)
 
 			// Add or delete tool, so start by deleting the old one with this number, if any
 			reprap.DeletePad(reprap.GetPad(padNumber));
+
+			SaveConfigOverrideFile(gb);
 		}
 		else
 		{
@@ -4320,6 +4344,8 @@ GCodeResult GCodes::ManagePad(GCodeBuffer& gb, const StringRef& reply)
 					return GCodeResult::error;
 				}
 				reprap.AddPad(pad);
+
+				SaveConfigOverrideFile(gb);
 			}
 			else
 			{
@@ -5506,29 +5532,10 @@ GCodeResult GCodes::WriteConfigOverrideFile(GCodeBuffer& gb, const StringRef& re
 		return GCodeResult::error;
 	}
 
-	if (ok)
+	if (!platform.WriteAccessoryConfig())
 	{
-		String<MaxFilenameLength> fn;
-
-		int h = reprap.GetCurrentHeadNumber();
-		int p = reprap.GetCurrentPadNumber();
-
-		fn.printf(ACCESSORY_CONFIG_FILE, h, p);
-		FileStore * const f = platform.OpenSysFile(fn.c_str(), OpenMode::write);
-		if (f == nullptr)
-		{
-			reply.printf("Failed to create file %s", fn.c_str());
-			return GCodeResult::error;
-		}
-
-		platform.WriteZProbeParameters(f);
-
-		if (!f->Close())
-		{
-			reply.printf("Failed to write file %s", fn.c_str());
-			platform.DeleteSysFile(fn.c_str());
-			return GCodeResult::error;
-		}
+		reply.copy("Failed to write file accessory config");
+		return GCodeResult::error;
 	}
 
 	if (!m501SeenInConfigFile)

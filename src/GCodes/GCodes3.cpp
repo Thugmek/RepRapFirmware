@@ -117,6 +117,11 @@ GCodeResult GCodes::SetPrintZProbe(GCodeBuffer& gb, const StringRef& reply)
 		}
 
 		platform.SetZProbeParameters(probeType, params);
+
+		if (gb.MachineState().runningM501 && !read) // Reading direct from config-ovveride - used only for migration from config-override to print heads and pads management
+		{
+			platform.MigrateZProbeOffsetFromConfigOverrideToConfigAccessory();
+		}
 	}
 	else
 	{

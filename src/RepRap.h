@@ -96,7 +96,7 @@ public:
 
 	void AddPad(Pad* pad);
 	void DeletePad(Pad* p);
-	void SelectPad(Pad* pad);
+	void SelectPad(GCodeBuffer& gb, Pad* pad);
 	Pad* GetPad(int padNumber) const;
 	void PrintPad(int padNumber, const StringRef& reply) const;
 	void PrintPads(const StringRef& reply) const;
@@ -140,6 +140,7 @@ public:
 	void Tick();
 	bool SpinTimeoutImminent() const;
 	bool IsStopped() const;
+	bool IsProcessingConfig() const;
 
 	uint16_t GetExtrudersInUse() const;
 	uint16_t GetToolHeatersInUse() const;
@@ -277,6 +278,7 @@ inline Tool* RepRap::GetCurrentTool() const { return currentTool; }
 inline uint16_t RepRap::GetExtrudersInUse() const { return activeExtruders; }
 inline uint16_t RepRap::GetToolHeatersInUse() const { return activeToolHeaters; }
 inline bool RepRap::IsStopped() const { return stopped; }
+inline bool RepRap::IsProcessingConfig() const { return processingConfig; };
 
 inline Pad* RepRap::GetCurrentPad() const { return currentPad; }
 
