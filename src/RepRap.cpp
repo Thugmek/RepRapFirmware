@@ -1945,6 +1945,243 @@ OutputBuffer *RepRap::GetTrilabStatusResponse(uint8_t type, ResponseSource sourc
 	char ch = GetStatusCharacter();
 	response->printf("{\"status\":\"%c\"", ch);
 
+	if (type > 1)
+	{
+		// ATX power
+		response->catf(",\"atxPower\":%d", platform->AtxPower() ? 1 : 0);
+
+		// Current tool number
+		response->catf(",\"currentTool\":%d", GetCurrentToolNumber());
+
+		// Current pad
+		response->catf(",\"currentPrintpad\":%d", GetCurrentPadNumber());
+
+		// Cooling fan value
+		response->cat(",\"fanPercent\":");
+		ch = '[';
+		for (size_t i = 0; i < NUM_FANS; i++)
+		{
+			response->catf("%c%d", ch, (int)lrintf(platform->GetFanValue(i) * 100.0));
+			ch = ',';
+		}
+		response->cat((ch == '[') ? "[]" : "]");
+
+		// Speed factors in %
+		response->catf(",\"speedFactor\":%.1f", (double)(gCodes->GetSpeedFactor()));
+
+		response->catf(",\"babystep\":%.3f", (double)gCodes->GetTotalBabyStepOffset(Z_AXIS));
+
+		ZProbe params = platform->GetZProbeParameters(platform->GetZProbeType());
+		response->catf(",\"currentTriggerHeight\":%.2f", (double)params.currentTriggerHeight);
+
+		/* Temperatures */
+		{
+			response->cat(",\"temps\":{");
+
+			/* Bed */
+			const int8_t bedHeater = (NumBedHeaters > 0) ? heat->GetBedHeater(0) : -1;
+			if (bedHeater != -1)
+			{
+				response->catf("\"bed\":{\"current\":%.1f,\"active\":%.1f,\"state\":%d}",
+					(double)heat->GetTemperature(bedHeater), (double)heat->GetActiveTemperature(bedHeater), heat->GetStatus(bedHeater));
+			}
+
+			/* Chamber */
+			const int8_t chamberHeater = (NumChamberHeaters > 0) ? heat->GetChamberHeater(0) : -1;
+			if (chamberHeater != -1)
+			{
+				response->catf("\"chamber\":{\"current\":%.1f,\"active\":%.1f,\"state\":%d}",
+					(double)heat->GetTemperature(chamberHeater), (double)heat->GetActiveTemperature(chamberHeater), heat->GetStatus(chamberHeater));
+			}
+
+			/* Tool temperatures */
+			response->cat(",\"tools\":{\"current\":[");
+			{
+				// Current temperatures
+				MutexLocker lock(toolListMutex);
+				for (const Tool *tool = toolList; tool != nullptr; tool = tool->Next())
+				{
+					ch = '[';
+					for (size_t heater = 0; heater < tool->heaterCount; heater++)
+					{
+						response->catf("%c%.1f", ch, (double)heat->GetTemperature(tool->Heater(heater)));
+						ch = ',';
+					}
+					response->cat((ch == '[') ? "[]" : "]");
+
+					if (tool->Next() != nullptr)
+					{
+						response->cat(',');
+					}
+				}
+
+				// Active temperatures
+				response->cat("],\"active\":[");
+				for (const Tool *tool = toolList; tool != nullptr; tool = tool->Next())
+				{
+					ch = '[';
+					for (size_t heater = 0; heater < tool->heaterCount; heater++)
+					{
+						response->catf("%c%.1f", ch, (double)tool->activeTemperatures[heater]);
+						ch = ',';
+					}
+					response->cat((ch == '[') ? "[]" : "]");
+
+					if (tool->Next() != nullptr)
+					{
+						response->cat(',');
+					}
+				}
+
+				response->cat("],\"state\":[");
+				for (const Tool *tool = toolList; tool != nullptr; tool = tool->Next())
+				{
+					ch = '[';
+					for (size_t heater = 0; heater < tool->heaterCount; heater++)
+					{
+						response->catf("%c%d", ch, heat->GetStatus(tool->Heater(heater)));
+						ch = ',';
+					}
+					response->cat((ch == '[') ? "[]" : "]");
+
+					if (tool->Next() != nullptr)
+					{
+						response->cat(',');
+					}
+				}
+			}
+			response->cat("]}}");
+		}
+
+		// Total and mounted volumes
+		size_t mountedCards = 0;
+		for (size_t i = 0; i < NumSdCards; i++)
+		{
+			if (platform->GetMassStorage()->IsDriveMounted(i))
+			{
+				mountedCards |= (1 << i);
+			}
+		}
+		response->catf(",\"mountedVolumes\":%u", mountedCards);
+
+		// Output notifications
+		{
+			if (!message.IsEmpty())
+			{
+				response->cat(",\"output\":{");
+
+				response->cat("\"message\":");
+				response->EncodeString(message, false);
+				message.Clear();
+
+				response->cat('}');
+			}
+		}
+	}
+
+	/* Extended Status Response */
+	if (type == 3)
+	{
+		// Machine name
+		response->cat(",\"name\":");
+		response->EncodeString(myName, false);
+
+		response->catf(",\"volumes\":%u", NumSdCards);
+
+		/* Tool Mapping */
+		{
+			response->cat(",\"tools\":[");
+			MutexLocker lock(toolListMutex);
+			for (Tool *tool = toolList; tool != nullptr; tool = tool->Next())
+			{
+				// Number
+				response->catf("{\"number\":%d", tool->Number());
+
+				// Name
+				const char *toolName = tool->GetName();
+				if (toolName[0] != 0)
+				{
+					response->cat(",\"name\":");
+					response->EncodeString(toolName, false);
+				}
+
+				// Head
+				response->catf(",\"printhead\":%d", tool->head != nullptr ? tool->head->GetNumber() : -1);
+
+	  			// Do we have any more tools?
+				response->cat((tool->Next() != nullptr) ? "}," : "}");
+			}
+			response->cat(']');
+		}
+
+		/* Printhead Mapping */
+		{
+			response->cat(",\"printheads\":[");
+
+			MutexLocker lock(headListMutex);
+			for (Head *head = headList; head != nullptr; head = head->Next())
+			{
+				// Number
+				response->catf("{\"number\":%d", head->GetNumber());
+
+				// Name
+				const char *headName = head->GetName();
+				if (headName[0] != 0)
+				{
+					response->cat(",\"name\":");
+					response->EncodeString(headName, false);
+				}
+
+				// Config
+				response->cat(",\"config\":");
+				response->EncodeString(head->GetConfigFileName(), false);
+
+			  	// Do we have any more tools?
+				response->cat((head->Next() != nullptr) ? "}," : "}");
+			}
+			response->cat(']');
+		}
+
+		/* Printpad Mapping */
+		{
+			response->cat(",\"printpads\":[");
+
+			MutexLocker lock(padListMutex);
+			for (Pad *pad = padList; pad != nullptr; pad = pad->Next())
+			{
+				// Number
+				response->catf("{\"number\":%d", pad->GetNumber());
+
+				// Name
+				const char *padName = pad->GetName();
+				if (padName[0] != 0)
+				{
+					response->cat(",\"name\":");
+					response->EncodeString(padName, false);
+				}
+
+				// Config
+				response->cat(",\"config\":");
+				response->EncodeString(pad->GetConfigFileName(), false);
+
+			  	// Do we have any more tools?
+				response->cat((pad->Next() != nullptr) ? "}," : "}");
+			}
+			response->cat(']');
+		}
+	}
+	else if (type == 4)
+	{
+		// Fraction of file printed
+		response->catf(",\"fractionPrinted\":%.1f", (double)((printMonitor->IsPrinting()) ? printMonitor->FractionOfFilePrinted() : 0.0));
+
+		// Print Duration
+		response->catf(",\"printDuration\":%.1f", (double)(printMonitor->GetPrintDuration()));
+
+		// Print Time Estimations - based on file progress
+		response->catf(",\"timesLeft\":%.1f", (double)(printMonitor->EstimateTimeLeft(fileBased)));
+	}
+
 	// G-code reply sequence for webserver (sequence number for AUX is handled later)
 	if (source == ResponseSource::HTTP)
 	{

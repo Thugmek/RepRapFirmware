@@ -4748,25 +4748,17 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		{
 			const int type = gb.Seen('S') ? gb.GetIValue() : 0;
 
-			switch (type)
+			outBuf = reprap.GetTrilabStatusResponse(type, (&gb == auxGCode) ? ResponseSource::AUX : ResponseSource::Generic);
+			if (outBuf != nullptr)
 			{
-			case 0:
-				outBuf = reprap.GetTrilabStatusResponse(type, (&gb == auxGCode) ? ResponseSource::AUX : ResponseSource::Generic);
-				if (outBuf != nullptr)
+				outBuf->cat('\n');
+				if (outBuf->HadOverflow())
 				{
-					outBuf->cat('\n');
-					if (outBuf->HadOverflow())
-					{
-						OutputBuffer::ReleaseAll(outBuf);
-					}
-				} else if (outBuf == nullptr)
-				{
-					result = GCodeResult::notFinished;			// we ran out of buffers, so try again later
+					OutputBuffer::ReleaseAll(outBuf);
 				}
-				break;
-			default:
-				result = ForwardToUsb(gb);
-				break;
+			} else if (outBuf == nullptr)
+			{
+				result = GCodeResult::notFinished;			// we ran out of buffers, so try again later
 			}
 		}
 		break;

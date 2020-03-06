@@ -402,6 +402,39 @@ float PrintMonitor::EstimateTimeLeft(PrintEstimationMethod method) const
 	return 0.0;
 }
 
+float PrintMonitor::FractionOfFilePrinted() const
+{
+	// Sum up the filament usage and the filament needed
+	float totalFilamentNeeded = 0.0;
+	for (size_t extruder = 0; extruder < MaxTotalDrivers - reprap.GetGCodes().GetTotalAxes(); extruder++)
+	{
+		totalFilamentNeeded += printingFileInfo.filamentNeeded[extruder];
+	}
+	const float extrRawTotal = gCodes.GetTotalRawExtrusion();
+
+	// If we have a reasonable amount of filament extruded, calculate estimated times left
+	if (totalFilamentNeeded > 0.0)
+	{
+		// Do we have more total filament extruded than reported by the file
+		if (extrRawTotal >= totalFilamentNeeded)
+		{
+			return 100.0;
+		}
+		return (extrRawTotal / totalFilamentNeeded * 100.0);
+	}
+	else if (printingFileInfo.objectHeight > 0) {
+		if (lastLayerZ >= printingFileInfo.objectHeight)
+		{
+			return 100.0;
+		}
+		return (lastLayerZ / printingFileInfo.objectHeight * 100.0);
+	}
+	else
+	{
+		return (gCodes.FractionOfFilePrinted() * 100.0);
+	}
+}
+
 // This returns the amount of time the machine has printed without interruptions (i.e. pauses)
 float PrintMonitor::GetPrintDuration() const
 {
