@@ -179,7 +179,7 @@ RepRap::RepRap() : toolList(nullptr), currentTool(nullptr), lastWarningMillis(0)
 	heatTaskIdleTicks(0),
 #endif
 	spinningModule(noModule), debug(0), stopped(false),
-	active(false), resetting(false), processingConfig(true), beepFrequency(0), beepDuration(0),
+	active(false), resetting(false), processingConfig(true), powerFail(false), beepFrequency(0), beepDuration(0),
 	diagnosticsDestination(MessageType::NoDestinationMessage), accessoryInitialized(false), justSentDiagnostics(false)
 {
 	OutputBuffer::Init();
@@ -308,7 +308,8 @@ void RepRap::Init()
 				platform->Message(UsbMessage, "Error, not found\n");
 			}
 
-			if (!platform->SysFileExists(RESUME_AFTER_POWER_FAIL_FILE)) // Not restore after power lost
+			powerFail = platform->SysFileExists(RESUME_AFTER_POWER_FAIL_FILE);
+			if (!powerFail) // Not restore after power lost
 			{
 				if (platform->DirectoryExists(USB_DIR)) // USB directory exists
 				{
@@ -1545,6 +1546,9 @@ OutputBuffer *RepRap::GetStatusResponse(uint8_t type, ResponseSource source)
 	// Time since last reset
 	response->catf(",\"time\":%.1f", (double)(millis64()/1000u));
 
+	// Power fail status
+	response->catf(",\"powerFail\":%d", powerFail);
+
 #if SUPPORT_SCANNER
 	// Scanner
 	if (scanner->IsEnabled())
@@ -1884,7 +1888,7 @@ OutputBuffer *RepRap::GetStatusResponse(uint8_t type, ResponseSource source)
 		}
 
 		// Fraction of file printed
-		response->catf("],\"fractionPrinted\":%.1f", (double)((printMonitor->IsPrinting()) ? (gCodes->FractionOfFilePrinted() * 100.0) : 0.0));
+		response->catf("],\"fractionPrinted\":%.1f", (double)((printMonitor->IsPrinting()) ? printMonitor->FractionOfFilePrinted() : 0.0));
 
 		// Byte position of the file being printed
 		response->catf(",\"filePosition\":%lu", gCodes->GetFilePosition());
@@ -1941,38 +1945,12 @@ OutputBuffer *RepRap::GetTrilabStatusResponse(uint8_t type, ResponseSource sourc
 		return nullptr;
 	}
 
-	// Machine status
-	char ch = GetStatusCharacter();
-	response->printf("{\"status\":\"%c\"", ch);
+	char ch;
 
-	if (type > 1)
+	if (type == 0)
 	{
-		// ATX power
-		response->catf(",\"atxPower\":%d", platform->AtxPower() ? 1 : 0);
-
-		// Current tool number
-		response->catf(",\"currentTool\":%d", GetCurrentToolNumber());
-
-		// Current pad
-		response->catf(",\"currentPrintpad\":%d", GetCurrentPadNumber());
-
-		// Cooling fan value
-		response->cat(",\"fanPercent\":");
-		ch = '[';
-		for (size_t i = 0; i < NUM_FANS; i++)
-		{
-			response->catf("%c%d", ch, (int)lrintf(platform->GetFanValue(i) * 100.0));
-			ch = ',';
-		}
-		response->cat((ch == '[') ? "[]" : "]");
-
-		// Speed factors in %
-		response->catf(",\"speedFactor\":%.1f", (double)(gCodes->GetSpeedFactor()));
-
-		response->catf(",\"babystep\":%.3f", (double)gCodes->GetTotalBabyStepOffset(Z_AXIS));
-
-		ZProbe params = platform->GetZProbeParameters(platform->GetZProbeType());
-		response->catf(",\"currentTriggerHeight\":%.2f", (double)params.currentTriggerHeight);
+		// Machine status
+		response->printf("{\"status\":\"%c\"", GetStatusCharacter());
 
 		/* Temperatures */
 		{
@@ -1982,16 +1960,8 @@ OutputBuffer *RepRap::GetTrilabStatusResponse(uint8_t type, ResponseSource sourc
 			const int8_t bedHeater = (NumBedHeaters > 0) ? heat->GetBedHeater(0) : -1;
 			if (bedHeater != -1)
 			{
-				response->catf("\"bed\":{\"current\":%.1f,\"active\":%.1f,\"state\":%d}",
-					(double)heat->GetTemperature(bedHeater), (double)heat->GetActiveTemperature(bedHeater), heat->GetStatus(bedHeater));
-			}
-
-			/* Chamber */
-			const int8_t chamberHeater = (NumChamberHeaters > 0) ? heat->GetChamberHeater(0) : -1;
-			if (chamberHeater != -1)
-			{
-				response->catf("\"chamber\":{\"current\":%.1f,\"active\":%.1f,\"state\":%d}",
-					(double)heat->GetTemperature(chamberHeater), (double)heat->GetActiveTemperature(chamberHeater), heat->GetStatus(chamberHeater));
+				response->catf("\"bed\":{\"current\":%.1f,\"active\":%.1f}",
+					(double)heat->GetTemperature(bedHeater), (double)heat->GetActiveTemperature(bedHeater));
 			}
 
 			/* Tool temperatures */
@@ -2032,8 +2002,123 @@ OutputBuffer *RepRap::GetTrilabStatusResponse(uint8_t type, ResponseSource sourc
 						response->cat(',');
 					}
 				}
+				response->cat("]}");
+			}
+			response->cat("}");
+		}
 
-				response->cat("],\"state\":[");
+		// Progress completion
+		response->catf(",\"fractionPrinted\":%.1f", (double)((printMonitor->IsPrinting()) ? printMonitor->FractionOfFilePrinted() : 0.0));
+
+		// Byte position of the file being printed
+		response->catf(",\"filePosition\":%lu", gCodes->GetFilePosition());
+
+		// Total extruded
+		float totalExtruded = 0.0;
+
+		float liveCoordinates[MaxTotalDrivers];
+		move->LiveCoordinates(liveCoordinates, currentTool);
+		for (size_t extruder = 0; extruder < GetExtrudersInUse(); extruder++)
+		{
+			totalExtruded += liveCoordinates[gCodes->GetTotalAxes() + extruder];
+		}
+		response->catf(",\"totalExtruded\":%.1f", (double)totalExtruded);
+
+		// Print Duration
+		response->catf(",\"printDuration\":%.1f", (double)(printMonitor->GetPrintDuration()));
+
+		// Power fail status
+		response->catf(",\"powerFail\":%d", powerFail);
+	}
+	else if (type == 2 or type == 3)
+	{
+		// Machine status
+		response->printf("{\"sta\":\"%c\"", GetStatusCharacter());
+
+		// Current tool number
+		response->catf(",\"cto\":%d", GetCurrentToolNumber());
+
+		// Current pad
+		response->catf(",\"cpp\":%d", GetCurrentPadNumber());
+
+		// Cooling fan value
+		response->cat(",\"fpe\":");
+		ch = '[';
+		for (size_t i = 0; i < NUM_FANS; i++)
+		{
+			response->catf("%c%d", ch, (int)lrintf(platform->GetFanValue(i) * 100.0));
+			ch = ',';
+		}
+		response->cat((ch == '[') ? "[]" : "]");
+
+		// Speed factors in %
+		response->catf(",\"sfa\":%.1f", (double)(gCodes->GetSpeedFactor()));
+
+		response->catf(",\"bst\":%.3f", (double)gCodes->GetTotalBabyStepOffset(Z_AXIS));
+
+		ZProbe params = platform->GetZProbeParameters(platform->GetZProbeType());
+		response->catf(",\"cth\":%.2f", (double)params.currentTriggerHeight);
+
+		/* Temperatures */
+		{
+			response->cat(",\"tmp\":{");
+
+			/* Bed */
+			const int8_t bedHeater = (NumBedHeaters > 0) ? heat->GetBedHeater(0) : -1;
+			if (bedHeater != -1)
+			{
+				response->catf("\"b\":{\"c\":%.1f,\"a\":%.1f,\"s\":%d}",
+					(double)heat->GetTemperature(bedHeater), (double)heat->GetActiveTemperature(bedHeater), heat->GetStatus(bedHeater));
+			}
+
+			/* Chamber */
+			const int8_t chamberHeater = (NumChamberHeaters > 0) ? heat->GetChamberHeater(0) : -1;
+			if (chamberHeater != -1)
+			{
+				response->catf("\"c\":{\"c\":%.1f,\"a\":%.1f,\"s\":%d}",
+					(double)heat->GetTemperature(chamberHeater), (double)heat->GetActiveTemperature(chamberHeater), heat->GetStatus(chamberHeater));
+			}
+
+			/* Tool temperatures */
+			response->cat(",\"t\":{\"c\":[");
+			{
+				// Current temperatures
+				MutexLocker lock(toolListMutex);
+				for (const Tool *tool = toolList; tool != nullptr; tool = tool->Next())
+				{
+					ch = '[';
+					for (size_t heater = 0; heater < tool->heaterCount; heater++)
+					{
+						response->catf("%c%.1f", ch, (double)heat->GetTemperature(tool->Heater(heater)));
+						ch = ',';
+					}
+					response->cat((ch == '[') ? "[]" : "]");
+
+					if (tool->Next() != nullptr)
+					{
+						response->cat(',');
+					}
+				}
+
+				// Active temperatures
+				response->cat("],\"a\":[");
+				for (const Tool *tool = toolList; tool != nullptr; tool = tool->Next())
+				{
+					ch = '[';
+					for (size_t heater = 0; heater < tool->heaterCount; heater++)
+					{
+						response->catf("%c%.1f", ch, (double)tool->activeTemperatures[heater]);
+						ch = ',';
+					}
+					response->cat((ch == '[') ? "[]" : "]");
+
+					if (tool->Next() != nullptr)
+					{
+						response->cat(',');
+					}
+				}
+
+				response->cat("],\"s\":[");
 				for (const Tool *tool = toolList; tool != nullptr; tool = tool->Next())
 				{
 					ch = '[';
@@ -2062,124 +2147,136 @@ OutputBuffer *RepRap::GetTrilabStatusResponse(uint8_t type, ResponseSource sourc
 				mountedCards |= (1 << i);
 			}
 		}
-		response->catf(",\"mountedVolumes\":%u", mountedCards);
+		response->catf(",\"mvo\":%u", mountedCards);
 
-		// Output notifications
-		{
-			if (!message.IsEmpty())
-			{
-				response->cat(",\"output\":{");
+		// Printing fileName
+		// response->catf(",\"pfn\":\"%s\"", printMonitor->IsPrinting() ? printMonitor->GetPrintingFilename() : "");
 
-				response->cat("\"message\":");
-				response->EncodeString(message, false);
-				message.Clear();
-
-				response->cat('}');
-			}
-		}
-	}
-
-	/* Extended Status Response */
-	if (type == 3)
-	{
-		// Machine name
-		response->cat(",\"name\":");
-		response->EncodeString(myName, false);
-
-		response->catf(",\"volumes\":%u", NumSdCards);
-
-		/* Tool Mapping */
-		{
-			response->cat(",\"tools\":[");
-			MutexLocker lock(toolListMutex);
-			for (Tool *tool = toolList; tool != nullptr; tool = tool->Next())
-			{
-				// Number
-				response->catf("{\"number\":%d", tool->Number());
-
-				// Name
-				const char *toolName = tool->GetName();
-				if (toolName[0] != 0)
-				{
-					response->cat(",\"name\":");
-					response->EncodeString(toolName, false);
-				}
-
-				// Head
-				response->catf(",\"printhead\":%d", tool->head != nullptr ? tool->head->GetNumber() : -1);
-
-	  			// Do we have any more tools?
-				response->cat((tool->Next() != nullptr) ? "}," : "}");
-			}
-			response->cat(']');
-		}
-
-		/* Printhead Mapping */
-		{
-			response->cat(",\"printheads\":[");
-
-			MutexLocker lock(headListMutex);
-			for (Head *head = headList; head != nullptr; head = head->Next())
-			{
-				// Number
-				response->catf("{\"number\":%d", head->GetNumber());
-
-				// Name
-				const char *headName = head->GetName();
-				if (headName[0] != 0)
-				{
-					response->cat(",\"name\":");
-					response->EncodeString(headName, false);
-				}
-
-				// Config
-				response->cat(",\"config\":");
-				response->EncodeString(head->GetConfigFileName(), false);
-
-			  	// Do we have any more tools?
-				response->cat((head->Next() != nullptr) ? "}," : "}");
-			}
-			response->cat(']');
-		}
-
-		/* Printpad Mapping */
-		{
-			response->cat(",\"printpads\":[");
-
-			MutexLocker lock(padListMutex);
-			for (Pad *pad = padList; pad != nullptr; pad = pad->Next())
-			{
-				// Number
-				response->catf("{\"number\":%d", pad->GetNumber());
-
-				// Name
-				const char *padName = pad->GetName();
-				if (padName[0] != 0)
-				{
-					response->cat(",\"name\":");
-					response->EncodeString(padName, false);
-				}
-
-				// Config
-				response->cat(",\"config\":");
-				response->EncodeString(pad->GetConfigFileName(), false);
-
-			  	// Do we have any more tools?
-				response->cat((pad->Next() != nullptr) ? "}," : "}");
-			}
-			response->cat(']');
-		}
-	}
-	else if (type == 4)
-	{
 		// Fraction of file printed
-		response->catf(",\"fractionPrinted\":%.1f", (double)((printMonitor->IsPrinting()) ? printMonitor->FractionOfFilePrinted() : 0.0));
+		response->catf(",\"fpr\":%.1f", (double)((printMonitor->IsPrinting()) ? printMonitor->FractionOfFilePrinted() : 0.0));
 
 		// Print Duration
-		response->catf(",\"printDuration\":%.1f", (double)(printMonitor->GetPrintDuration()));
+		response->catf(",\"pdu\":%.1f", (double)(printMonitor->GetPrintDuration()));
 
 		// Print Time Estimations - based on file progress
-		response->catf(",\"timesLeft\":%.1f", (double)(printMonitor->EstimateTimeLeft(fileBased)));
+		response->catf(",\"tle\":%.1f", (double)(printMonitor->EstimateTimeLeft(fileBased)));
+
+		// Output notifications
+		/*
+		if (!message.IsEmpty())
+		{
+			response->cat(",\"msg\":");
+			response->EncodeString(message, false);
+			message.Clear();
+		}
+		*/
+
+		// Report message box
+		if (mbox.active)
+		{
+			response->cat(",\"mbo\":{\"tit\":");
+			response->EncodeString(mbox.title, false);
+			response->cat(",\"msg\":");
+			response->EncodeString(mbox.message, false);
+			response->catf(",\"mod\":%d,\"seq\":%" PRIu32, mbox.mode, mbox.seq);
+			response->cat('}');
+		}
+
+		/* Extended Status Response */
+		if (type == 3)
+		{
+			// Machine name
+			response->cat(",\"nam\":");
+			response->EncodeString(myName, false);
+
+			response->catf(",\"vol\":%u", NumSdCards);
+
+			/* Tool Mapping */
+			{
+				response->cat(",\"too\":[");
+				MutexLocker lock(toolListMutex);
+				for (Tool *tool = toolList; tool != nullptr; tool = tool->Next())
+				{
+					// Number
+					response->catf("{\"num\":%d", tool->Number());
+
+					// Name
+					const char *toolName = tool->GetName();
+					if (toolName[0] != 0)
+					{
+						response->cat(",\"nam\":");
+						response->EncodeString(toolName, false);
+					}
+
+					// Head
+					response->catf(",\"phe\":%d", tool->head != nullptr ? tool->head->GetNumber() : -1);
+
+					// Do we have any more tools?
+					response->cat((tool->Next() != nullptr) ? "}," : "}");
+				}
+				response->cat(']');
+			}
+
+			/* Printhead Mapping */
+			{
+				response->cat(",\"phe\":[");
+
+				MutexLocker lock(headListMutex);
+				for (Head *head = headList; head != nullptr; head = head->Next())
+				{
+					// Number
+					response->catf("{\"num\":%d", head->GetNumber());
+
+					// Name
+					const char *headName = head->GetName();
+					if (headName[0] != 0)
+					{
+						response->cat(",\"nam\":");
+						response->EncodeString(headName, false);
+					}
+
+					/*
+					// Config
+					response->cat(",\"con\":");
+					response->EncodeString(head->GetConfigFileName(), false);
+					*/
+
+					// Do we have any more tools?
+					response->cat((head->Next() != nullptr) ? "}," : "}");
+				}
+				response->cat(']');
+			}
+
+			/* Printpad Mapping */
+			{
+				response->cat(",\"ppa\":[");
+
+				MutexLocker lock(padListMutex);
+				for (Pad *pad = padList; pad != nullptr; pad = pad->Next())
+				{
+					// Number
+					response->catf("{\"num\":%d", pad->GetNumber());
+
+					// Name
+					const char *padName = pad->GetName();
+					if (padName[0] != 0)
+					{
+						response->cat(",\"nam\":");
+						response->EncodeString(padName, false);
+					}
+
+					/*
+					// Config
+					response->cat(",\"con\":");
+					response->EncodeString(pad->GetConfigFileName(), false);
+					*/
+
+					// Do we have any more tools?
+					response->cat((pad->Next() != nullptr) ? "}," : "}");
+				}
+				response->cat(']');
+			}
+		}
 	}
 
 	// G-code reply sequence for webserver (sequence number for AUX is handled later)
@@ -2194,7 +2291,7 @@ OutputBuffer *RepRap::GetTrilabStatusResponse(uint8_t type, ResponseSource sourc
 		if (reply != nullptr && response != nullptr)
 		{
 			// Send the response to the last command. Do this last
-			response->catf(",\"seq\":%" PRIu32 ",\"resp\":", platform->GetAuxSeq());	// send the response sequence number
+			response->cat(",\"rsp\":");
 
 			// Send the JSON response
 			response->EncodeReply(reply);												// also releases the OutputBuffer chain

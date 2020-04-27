@@ -119,6 +119,8 @@ public:
 	void FlagTemperatureFault(int8_t dudHeater);
 	void ClearTemperatureFault(int8_t wasDudHeater);
 
+	void SetPowerFail(bool val);
+
 	Platform& GetPlatform() const;
 	Move& GetMove() const;
 	Heat& GetHeat() const;
@@ -238,6 +240,7 @@ private:
 	bool active;
 	bool resetting;
 	bool processingConfig;
+	bool powerFail;
 
 	String<RepRapPasswordLength> password;
 	String<MachineNameLength> myName;
@@ -278,9 +281,11 @@ inline Tool* RepRap::GetCurrentTool() const { return currentTool; }
 inline uint16_t RepRap::GetExtrudersInUse() const { return activeExtruders; }
 inline uint16_t RepRap::GetToolHeatersInUse() const { return activeToolHeaters; }
 inline bool RepRap::IsStopped() const { return stopped; }
-inline bool RepRap::IsProcessingConfig() const { return processingConfig; };
+inline bool RepRap::IsProcessingConfig() const { return processingConfig; }
 
 inline Pad* RepRap::GetCurrentPad() const { return currentPad; }
+
+inline void RepRap::SetPowerFail(bool val) { powerFail = val; }
 
 #define INTERNAL_ERROR do { reprap.ReportInternalError((__FILE__), (__func__), (__LINE__)); } while(0)
 

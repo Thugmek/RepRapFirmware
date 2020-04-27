@@ -163,7 +163,7 @@ public:
 	bool RunPrintpadConfigFile(GCodeBuffer& gb, Pad* pad);
 	bool RunAccessoryConfigFile(const char* fileName);
 
-	bool SaveConfigOverrideFile(GCodeBuffer& gb); 				// Save the config-override file
+	bool SaveConfigOverrideFile(GCodeBuffer& gb, bool saveAccessoryConfig = true); 				// Save the config-override file
 
 	bool IsAxisHomed(unsigned int axis) const							// Has the axis been homed?
 		{ return IsBitSet(axesHomed, axis); }
@@ -407,7 +407,7 @@ private:
 	GCodeResult SimulateFile(GCodeBuffer& gb, const StringRef &reply, const StringRef& file, bool updateFile);	// Handle M37 to simulate a whole file
 	GCodeResult ChangeSimulationMode(GCodeBuffer& gb, const StringRef &reply, uint32_t newSimulationMode);		// Handle M37 to change the simulation mode
 
-	GCodeResult WriteConfigOverrideFile(GCodeBuffer& gb, const StringRef& reply) const; // Write the config-override file
+	GCodeResult WriteConfigOverrideFile(GCodeBuffer& gb, const StringRef& reply, bool writeAccessoryConfig = true) const; // Write the config-override file
 
 	bool WriteConfigOverrideHeader(FileStore *f) const;							// Write the config-override header
 

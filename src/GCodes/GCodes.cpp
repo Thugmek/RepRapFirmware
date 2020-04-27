@@ -403,13 +403,13 @@ bool GCodes::RunAccessoryConfigFile(const char* fileName)
 	return DoFileMacro(*trilabDaemonGCode, fileName, false);
 }
 
-bool GCodes::SaveConfigOverrideFile(GCodeBuffer& gb)
+bool GCodes::SaveConfigOverrideFile(GCodeBuffer& gb, bool saveAccessoryConfig)
 {
 	if (!reprap.IsProcessingConfig() && !runningConfigFile && !gb.MachineState().runningM501 && !gb.MachineState().runningM502)
 	{
 		String<GCodeReplyLength> reply;
 
-		return WriteConfigOverrideFile(gb, reply.GetRef()) == GCodeResult::ok;
+		return WriteConfigOverrideFile(gb, reply.GetRef(), saveAccessoryConfig) == GCodeResult::ok;
 	}
 	return false;
 }
@@ -3881,13 +3881,16 @@ void GCodes::StartPrinting(bool fromStart)
 	platform.MessageF(LogMessage,
 						(simulationMode == 0) ? "Started printing file %s\n" : "Started simulating printing file %s\n",
 							reprap.GetPrintMonitor().GetPrintingFilename());
+
+	platform.Message(UsbMessage, "Printing file started\n");
+
 	if (fromStart)
 	{
 		// Get the fileGCode to execute the start macro so that any M82/M83 codes will be executed in the correct context
 		DoFileMacro(*fileGCode, START_G, false);
 	}
 
-	platform.DeleteSysFile(RESUME_AFTER_POWER_FAIL_G);
+	//platform.DeleteSysFile(RESUME_AFTER_POWER_FAIL_G);
 }
 
 // Function to handle dwell delays. Returns true for dwell finished, false otherwise.
@@ -5141,6 +5144,8 @@ void GCodes::StopPrint(StopPrintReason reason)
 				(reason == StopPrintReason::normalCompletion) ? "Finished" : "Cancelled",
 				printingFilename, printMinutes/60u, printMinutes % 60u);
 
+		platform.Message(UsbMessage, "Printing file done\n");
+
 		if (reason == StopPrintReason::normalCompletion && simulationMode == 0)
 		{
 			platform.DeleteSysFile(RESUME_AFTER_POWER_FAIL_G);
@@ -5443,7 +5448,7 @@ void GCodes::SetAllAxesNotHomed()
 }
 
 // Write the config-override file returning true if an error occurred
-GCodeResult GCodes::WriteConfigOverrideFile(GCodeBuffer& gb, const StringRef& reply) const
+GCodeResult GCodes::WriteConfigOverrideFile(GCodeBuffer& gb, const StringRef& reply, bool writeAccessoryConfig) const
 {
 	const char* const fileName = CONFIG_OVERRIDE_G;
 	FileStore * const f = platform.OpenSysFile(fileName, OpenMode::write);
@@ -5532,10 +5537,13 @@ GCodeResult GCodes::WriteConfigOverrideFile(GCodeBuffer& gb, const StringRef& re
 		return GCodeResult::error;
 	}
 
-	if (!platform.WriteAccessoryConfig())
+	if (writeAccessoryConfig)
 	{
-		reply.copy("Failed to write file accessory config");
-		return GCodeResult::error;
+		if (!platform.WriteAccessoryConfig())
+		{
+			reply.copy("Failed to write file accessory config");
+			return GCodeResult::error;
+		}
 	}
 
 	if (!m501SeenInConfigFile)

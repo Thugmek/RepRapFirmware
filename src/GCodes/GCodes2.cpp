@@ -4676,19 +4676,39 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 #endif
 
 	case 916:
-		if (!platform.SysFileExists(RESUME_AFTER_POWER_FAIL_G))
 		{
-			reply.copy("No resume file found");
-			result = GCodeResult::error;
-		}
-		else if (!platform.SysFileExists(RESUME_PROLOGUE_G))
-		{
-			reply.printf("Resume prologue file '%s' not found", RESUME_PROLOGUE_G);
-			result = GCodeResult::error;
-		}
-		else
-		{
-			DoFileMacro(gb, RESUME_AFTER_POWER_FAIL_G, true);
+			bool resume = true;
+			if (gb.Seen('S'))
+			{
+				resume = gb.GetIValue() > 0;
+			}
+
+			if (resume)
+			{
+				if (!platform.SysFileExists(RESUME_AFTER_POWER_FAIL_G))
+				{
+					reply.copy("No resume file found");
+					result = GCodeResult::error;
+				}
+				else if (!platform.SysFileExists(RESUME_PROLOGUE_G))
+				{
+					reply.printf("Resume prologue file '%s' not found", RESUME_PROLOGUE_G);
+					result = GCodeResult::error;
+				}
+				else
+				{
+					DoFileMacro(gb, RESUME_AFTER_POWER_FAIL_G, true);
+				}
+			}
+			else
+			{
+				if (platform.SysFileExists(RESUME_AFTER_POWER_FAIL_G))
+				{
+					platform.DeleteSysFile(RESUME_AFTER_POWER_FAIL_G);
+				}
+			}
+
+			reprap.SetPowerFail(false);
 		}
 		break;
 
@@ -4845,7 +4865,7 @@ bool GCodes::HandleTcode(GCodeBuffer& gb, const StringRef& reply)
 				{
 					reprap.SelectHead(gb, tool, head);
 
-					SaveConfigOverrideFile(gb);
+					SaveConfigOverrideFile(gb, false);
 				}
 				else
 				{
@@ -4925,7 +4945,7 @@ bool GCodes::HandleHcode(GCodeBuffer& gb, const StringRef& reply)
 			{
 				reprap.SelectHead(gb, tool, head);
 
-				SaveConfigOverrideFile(gb);
+				SaveConfigOverrideFile(gb, false);
 			}
 			else
 			{
@@ -4966,7 +4986,7 @@ bool GCodes::HandlePcode(GCodeBuffer& gb, const StringRef& reply)
 		{
 			reprap.SelectPad(gb, pad);
 
-			SaveConfigOverrideFile(gb);
+			SaveConfigOverrideFile(gb, false);
 		}
 		else
 		{
