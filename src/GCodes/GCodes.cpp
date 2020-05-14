@@ -3882,7 +3882,7 @@ void GCodes::StartPrinting(bool fromStart)
 						(simulationMode == 0) ? "Started printing file %s\n" : "Started simulating printing file %s\n",
 							reprap.GetPrintMonitor().GetPrintingFilename());
 
-	platform.Message(UsbMessage, "Printing file started\n");
+	platform.MessageF(UsbMessage, "Started printing file: %s\n", reprap.GetPrintMonitor().GetPrintingFilename());
 
 	if (fromStart)
 	{
@@ -5144,7 +5144,7 @@ void GCodes::StopPrint(StopPrintReason reason)
 				(reason == StopPrintReason::normalCompletion) ? "Finished" : "Cancelled",
 				printingFilename, printMinutes/60u, printMinutes % 60u);
 
-		platform.Message(UsbMessage, "Printing file done\n");
+		platform.MessageF(UsbMessage, "Printing file %s\n", (reason == StopPrintReason::normalCompletion) ? "finished" : "cancelled");
 
 		if (reason == StopPrintReason::normalCompletion && simulationMode == 0)
 		{

@@ -796,7 +796,7 @@ bool Heat::CheckSafetyTimer()
 					SetActiveTemperature(heater, 0.0);
 			}
 			*/
-			SwitchOffAll(true);
+			SwitchOffAll(false);
 
 			return true;
 		}

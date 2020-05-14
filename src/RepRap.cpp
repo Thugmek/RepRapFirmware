@@ -1789,6 +1789,9 @@ OutputBuffer *RepRap::GetStatusResponse(uint8_t type, ResponseSource source)
 			response->cat(']');
 		}
 
+		/* Bed Mapping */
+		response->catf(",\"bed\":{\"pad\":%d}", GetCurrentPadNumber());
+
 		/* Head Mapping */
 		{
 			response->cat(",\"heads\":[");
@@ -1844,9 +1847,6 @@ OutputBuffer *RepRap::GetStatusResponse(uint8_t type, ResponseSource source)
 			}
 			response->cat(']');
 		}
-
-		/* Current pad */
-		response->catf(",\"currentPad\":%d", GetCurrentPadNumber());
 
 		// MCU temperatures
 #if HAS_CPU_TEMP_SENSOR
@@ -2039,7 +2039,7 @@ OutputBuffer *RepRap::GetTrilabStatusResponse(uint8_t type, ResponseSource sourc
 		response->catf(",\"cto\":%d", GetCurrentToolNumber());
 
 		// Current pad
-		response->catf(",\"cpp\":%d", GetCurrentPadNumber());
+		// response->catf(",\"cpp\":%d", GetCurrentPadNumber());
 
 		// Cooling fan value
 		response->cat(",\"fpe\":");
@@ -2186,8 +2186,8 @@ OutputBuffer *RepRap::GetTrilabStatusResponse(uint8_t type, ResponseSource sourc
 		if (type == 3)
 		{
 			// Machine name
-			response->cat(",\"nam\":");
-			response->EncodeString(myName, false);
+			// response->cat(",\"nam\":");
+			// response->EncodeString(myName, false);
 
 			response->catf(",\"vol\":%u", NumSdCards);
 
@@ -2215,6 +2215,16 @@ OutputBuffer *RepRap::GetTrilabStatusResponse(uint8_t type, ResponseSource sourc
 					response->cat((tool->Next() != nullptr) ? "}," : "}");
 				}
 				response->cat(']');
+			}
+
+			/* Bed Mapping */
+			{
+				response->cat(",\"bed\":{");
+				{
+					// Pad
+					response->catf("\"ppa\":%d", GetCurrentPadNumber());
+				}
+				response->cat('}');
 			}
 
 			/* Printhead Mapping */
