@@ -2172,6 +2172,7 @@ OutputBuffer *RepRap::GetTrilabStatusResponse(uint8_t type, ResponseSource sourc
 		*/
 
 		// Report message box
+		/*
 		if (mbox.active)
 		{
 			response->cat(",\"mbo\":{\"tit\":");
@@ -2181,6 +2182,7 @@ OutputBuffer *RepRap::GetTrilabStatusResponse(uint8_t type, ResponseSource sourc
 			response->catf(",\"mod\":%d,\"seq\":%" PRIu32, mbox.mode, mbox.seq);
 			response->cat('}');
 		}
+		*/
 
 		/* Extended Status Response */
 		if (type == 3)
@@ -2712,6 +2714,131 @@ OutputBuffer *RepRap::GetFilesResponse(const char *dir, unsigned int startAt, bo
 				++filesFound;
 			}
 			gotFile = platform->GetMassStorage()->FindNext(fileInfo);
+		}
+	}
+
+	if (err != 0)
+	{
+		response->catf("],\"err\":%u}", err);
+	}
+	else
+	{
+		response->catf("],\"next\":%u,\"err\":%u}", nextFile, err);
+	}
+	return response;
+}
+
+// Get the list of files in the specified directory in JSON format.
+// If flagDirs is true then we prefix each directory with a * character.
+OutputBuffer *RepRap::GetSortedFilesResponse(const char *dir, unsigned int startAt, bool flagsDirs)
+{
+	// Need something to write to...
+	OutputBuffer *response;
+	if (!OutputBuffer::Allocate(response))
+	{
+		return nullptr;
+	}
+
+	response->copy("{\"dir\":");
+	response->EncodeString(dir, false);
+	response->catf(",\"first\":%u,\"files\":[", startAt);
+	unsigned int err;
+	unsigned int nextFile = 0;
+
+	if (!platform->GetMassStorage()->CheckDriveMounted(dir))
+	{
+		err = 1;
+	}
+	else if (!platform->GetMassStorage()->DirectoryExists(dir))
+	{
+		err = 2;
+	}
+	else
+	{
+		err = 0;
+		FileInfo fileInfo;
+		unsigned int filesFound = 0;
+		time_t previousFileLastModified = LONG_MAX;
+		bool findSameLastModified = false;
+		unsigned int sameLastModifiedCount = 0;
+
+		size_t bytesLeft = OutputBuffer::GetBytesLeft(response);	// don't write more bytes than we can
+
+		while (true)
+		{
+			FileInfo nextFileInfo;
+			nextFileInfo.lastModified = 0;
+			unsigned int i = 0;
+
+			bool gotFile = platform->GetMassStorage()->FindFirst(dir, fileInfo);
+			while (gotFile)
+			{
+				if (fileInfo.fileName[0] != '.') // ignore Mac resource files and Linux hidden files
+				{
+					if (findSameLastModified) { // try searching other files with the same date
+						if (fileInfo.lastModified == previousFileLastModified) // file with same date
+						{
+							i += 1; // increase the counter of same dates
+
+							if (i > sameLastModifiedCount) // another file with the same date
+							{
+								nextFileInfo.fileName.copy(fileInfo.fileName.c_str());
+								nextFileInfo.isDirectory = fileInfo.isDirectory;
+								nextFileInfo.lastModified = fileInfo.lastModified;
+
+								sameLastModifiedCount += 1; // increase counter same date
+
+								platform->GetMassStorage()->AbandonFindNext();
+								break;
+							}
+						}
+					}
+					else // search an older file
+					{
+						if ((fileInfo.lastModified > nextFileInfo.lastModified) && (fileInfo.lastModified < previousFileLastModified))
+						{
+							nextFileInfo.fileName.copy(fileInfo.fileName.c_str());
+							nextFileInfo.isDirectory = fileInfo.isDirectory;
+							nextFileInfo.lastModified = fileInfo.lastModified;
+
+							sameLastModifiedCount = 1; // first file found
+							findSameLastModified = true; // next search the same date
+						}
+					}
+				}
+				gotFile = platform->GetMassStorage()->FindNext(fileInfo);
+			}
+
+			if (!nextFileInfo.fileName.IsEmpty()) // Finded file, add to list
+			{
+				previousFileLastModified = nextFileInfo.lastModified;
+
+				if (filesFound >= startAt)
+				{
+					if (bytesLeft < nextFileInfo.fileName.strlen() * 2 + 20)
+					{
+						// No more space available - stop here
+						nextFile = filesFound;
+						break;
+					}
+
+					// Write separator and filename
+					if (filesFound != startAt)
+					{
+						bytesLeft -= response->cat(',');
+					}
+
+					bytesLeft -= response->EncodeString(nextFileInfo.fileName, false, flagsDirs && nextFileInfo.isDirectory);
+				}
+
+				++filesFound;
+			}
+			else if (findSameLastModified) // No another file with the same date found, cancel another search with the same date
+			{
+				findSameLastModified = false;
+			}
+			else // No another file found
+				break;
 		}
 	}
 

@@ -343,6 +343,8 @@ bool GCodes::HandleGcode(GCodeBuffer& gb, const StringRef& reply)
 		break;
 
 	case 28: // Home
+		ForwardToUsb(gb);
+
 		result = DoHome(gb, reply);
 		break;
 
@@ -469,6 +471,10 @@ bool GCodes::HandleGcode(GCodeBuffer& gb, const StringRef& reply)
 
 	case 92: // Set position
 		result = SetPositions(gb);
+		break;
+
+	case 1009: // Purge line
+		result = DoFileMacro(gb, PURGE_LINE_G, true, 98) ? GCodeResult::ok : GCodeResult::error;
 		break;
 
 	case 1031: // Return the probe value, or set probe variables
@@ -754,7 +760,11 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 
 			if (sparam == 2)
 			{
-				outBuf = reprap.GetFilesResponse(dir.c_str(), rparam, true);	// send the file list in JSON format
+				if (strncmp(dir.c_str(), "2:", 2) == 0) // usb file list is sorted in RPi
+					outBuf = reprap.GetFilesResponse(dir.c_str(), rparam, true);	// send the file list in JSON format
+				else
+					outBuf = reprap.GetSortedFilesResponse(dir.c_str(), rparam, true);	// send the sorted file list in JSON format
+
 				if (outBuf == nullptr)
 				{
 					return false;
@@ -764,6 +774,15 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			else if (sparam == 3)
 			{
 				outBuf = reprap.GetFilelistResponse(dir.c_str(), rparam);
+				if (outBuf == nullptr)
+				{
+					return false;
+				}
+				outBuf->cat('\n');
+			}
+			else if (sparam == 4) // Unsorted
+			{
+				outBuf = reprap.GetFilesResponse(dir.c_str(), rparam, true);	// send the file list in JSON format
 				if (outBuf == nullptr)
 				{
 					return false;
@@ -2558,7 +2577,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			}
 
 			String<GCODE_LENGTH> message;
-			message.printf("command: ack_message, data: %d\n", cancelled ? 1 : 0);
+			message.printf("ack_message: %d\n", cancelled ? 1 : 0);
 			platform.Message(BluetoothMessage, message.c_str());
 		}
 		break;

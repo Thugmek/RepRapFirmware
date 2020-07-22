@@ -152,6 +152,7 @@ public:
 	OutputBuffer *GetConfigResponse();
 	OutputBuffer *GetLegacyStatusResponse(uint8_t type, int seq);
 	OutputBuffer *GetFilesResponse(const char* dir, unsigned int startAt, bool flagsDirs);
+	OutputBuffer *GetSortedFilesResponse(const char* dir, unsigned int startAt, bool flagsDirs);
 	OutputBuffer *GetFilelistResponse(const char* dir, unsigned int startAt);
 	bool GetFileInfoResponse(const char *filename, OutputBuffer *&response, bool quitEarly);
 

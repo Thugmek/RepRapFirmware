@@ -288,6 +288,8 @@ private:
 																		// Run a GCode macro file, optionally report error if not found
 	void FileMacroCyclesReturn(GCodeBuffer& gb);						// End a macro
 
+	void HandleProbingError(GCodeBuffer& gb);							// Handle probing error, stop probing macro and print
+
 	bool ActOnCode(GCodeBuffer& gb, const StringRef& reply);			// Do a G, M or T Code
 	bool HandleGcode(GCodeBuffer& gb, const StringRef& reply);			// Do a G code
 	bool HandleMcode(GCodeBuffer& gb, const StringRef& reply);			// Do an M code
@@ -684,6 +686,7 @@ private:
 	static constexpr const char* REHOME_G = "rehome.g";
 #endif
 	static constexpr const char* INITIALIZE_ACCESSORIES_G = "InitializeAccessory.g";
+	static constexpr const char* PURGE_LINE_G = "purge-line.g";
 
 	static constexpr const float MinServoPulseWidth = 544.0, MaxServoPulseWidth = 2400.0;
 };

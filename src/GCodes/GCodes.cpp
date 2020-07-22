@@ -1072,6 +1072,7 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 			else if (platform.GetZProbeResult() == EndStopHit::lowHit)
 			{
 				reprap.GetHeat().SuspendHeaters(false);
+				HandleProbingError(gb);
 				platform.Message(ErrorMessage, "Z probe already triggered before probing move started\n");
 				gb.SetState(GCodeState::normal);
 				if (platform.GetZProbeType() != ZProbeType::none && !probeIsDeployed)
@@ -1110,6 +1111,7 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 				platform.SetProbing(false);
 				if (!zProbeTriggered)
 				{
+					HandleProbingError(gb);
 					platform.Message(ErrorMessage, "Z probe was not triggered during probing move\n");
 					gb.SetState(GCodeState::normal);
 					if (platform.GetZProbeType() != ZProbeType::none && !probeIsDeployed)
@@ -1182,6 +1184,7 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 			}
 			else
 			{
+				HandleProbingError(gb);
 				platform.Message(ErrorMessage, "Z probe readings not consistent\n");
 				gb.SetState(GCodeState::normal);
 				if (platform.GetZProbeType() != ZProbeType::none && !probeIsDeployed)
@@ -1337,6 +1340,7 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 			{
 				// Z probe is already triggered at the start of the move, so abandon the probe and record an error
 				reprap.GetHeat().SuspendHeaters(false);
+				HandleProbingError(gb);
 				platform.Message(ErrorMessage, "Z probe already triggered at start of probing move\n");
 				if (g30ProbePointIndex >= 0)
 				{
@@ -1383,7 +1387,9 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 				platform.SetProbing(false);
 				if (!zProbeTriggered)
 				{
+					HandleProbingError(gb);
 					platform.Message(ErrorMessage, "Z probe was not triggered during probing move\n");
+
 					g30zHeightErrorSum = g30zHeightError = 0.0;
 					hadProbingError = true;
 				}
@@ -1541,6 +1547,7 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 			Tool * const tool = reprap.GetCurrentTool();
 			if (tool == nullptr)
 			{
+				HandleProbingError(gb);
 				platform.Message(ErrorMessage, "Tool was deselected during G30 S-2 command\n");
 				error = true;
 			}
@@ -1924,6 +1931,8 @@ void GCodes::CheckFilament()
 		DoPause(*autoPauseGCode, PauseReason::filamentChange, filamentErrorString.c_str());
 		lastFilamentError = FilamentSensorStatus::ok;
 		platform.Message(LogMessage, filamentErrorString.c_str());
+
+		platform.MessageF(BluetoothMessage, "no_filament: %s\n", filamentErrorString.c_str());
 	}
 }
 
@@ -3523,6 +3532,16 @@ void GCodes::FileMacroCyclesReturn(GCodeBuffer& gb)
 
 		gb.PopState();
 		gb.Init();
+	}
+}
+
+void GCodes::HandleProbingError(GCodeBuffer& gb)
+{
+	FileMacroCyclesReturn(gb);
+
+	if (reprap.GetPrintMonitor().IsPrinting())
+	{
+		StopPrint(StopPrintReason::abort);
 	}
 }
 

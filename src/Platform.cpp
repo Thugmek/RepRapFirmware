@@ -3974,7 +3974,7 @@ void Platform::Message(MessageType type, const char *message)
 	else
 	{
 		String<FormatStringLength> formatString;
-		formatString.copy(((type & ErrorMessageFlag) != 0) ? "Error: " : "Warning: ");
+		formatString.copy(((type & ErrorMessageFlag) != 0) ? "error: " : "warning: ");
 		formatString.cat(message);
 		RawMessage((MessageType)(type & ~(ErrorMessageFlag | WarningMessageFlag)), formatString.c_str());
 	}
