@@ -783,22 +783,38 @@ void Heat::ResetSafetyTimer()
 		safetyTimer.Stop();
 }
 
-bool Heat::CheckSafetyTimer()
+bool Heat::CheckSafetyTimer(bool includingChamberAndBed)
 {
 	if (safetyTimerTimeout > 0)
 	{
 		if (safetyTimer.CheckAndStop(safetyTimerTimeout))
 		{
-			/*
+		    /*
 			for (int heater = 0; heater < (int)NumHeaters; ++heater)
 			{
 				if (!IsChamberHeater(heater))
 					SetActiveTemperature(heater, 0.0);
 			}
 			*/
-			SwitchOffAll(false);
+			bool heatersActive = false;
+			for (int heater = 0; heater < (int)NumHeaters; ++heater)
+			{
+				if (includingChamberAndBed || !IsChamberHeater(heater))
+				{
+					heatersActive |= (GetActiveTemperature(heater) > 0);
+				}
+			}
 
-			return true;
+			if (heatersActive)
+			{
+				SwitchOffAll(includingChamberAndBed);
+
+				return true;
+			}
+			else
+			{
+				return false; // Heaters inactive, do not disable it
+			}
 		}
 		else
 			return false;

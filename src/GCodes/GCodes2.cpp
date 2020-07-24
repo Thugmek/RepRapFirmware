@@ -4516,6 +4516,57 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		}
 		break;
 
+	case 782: // BT module reset
+		{
+			result = GCodeResult::error;
+
+			uint32_t bt_baudrates[9] = { 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400 };
+			uint32_t mem_baudrate = platform.GetBaudRate(1); // backup baudrate setting
+
+			platform.FlushAuxMessages();
+
+			bool detected = false;
+			char rsp[40];
+
+			for( int i = 0; i < 9; i++) { // loop for baudrate
+				platform.SetBaudRate(1, bt_baudrates[i]); // initial baudrate
+
+				auxInput->Reset(); // reset serial input buffer
+
+				platform.SendAuxMessage("AT\r\n", true); // test baudrate
+
+				auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+				if (strcmp(rsp, "OK") == 0)
+				{
+					detected = true;
+					break;
+				}
+			}
+
+			if (detected)
+			{
+				platform.SendAuxMessage("AT+RESET\r\n", true);
+
+				auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+				auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+				if (strcmp(rsp, "OK") == 0)
+				{
+					reply.copy("Reset BT module done");
+					result = GCodeResult::ok;
+				}
+				else
+				{
+					reply.copy("Reset BT module fault");
+					result = GCodeResult::ok;
+				}
+			}
+
+			platform.SetBaudRate(1, mem_baudrate); // restore original baudrate
+
+			auxInput->Reset(); // reset serial input buffer
+		}
+		break;
+
 	case 851: // Set Z probe offset, only for Marlin compatibility
 		{
 			ZProbe params = platform.GetCurrentZProbeParameters();

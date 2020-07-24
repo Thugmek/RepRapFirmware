@@ -157,7 +157,7 @@ public:
 
 	void SetSafetyTimer(uint32_t timeout);
 	void ResetSafetyTimer();
-	bool CheckSafetyTimer();
+	bool CheckSafetyTimer(bool includingChamberAndBed);
 	void StopSafetyTimer();
 
 	void SetLastActiveTemperature(int8_t heater, float t);

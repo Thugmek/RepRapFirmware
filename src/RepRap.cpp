@@ -466,7 +466,7 @@ void RepRap::Spin()
 		char status = GetStatusCharacter();
 		if (status == 'B' or status == 'P' or status == 'D' or status == 'R' or status == 'T')
 			heat->ResetSafetyTimer();
-		else if (heat->CheckSafetyTimer())
+		else if (heat->CheckSafetyTimer(status == 'I')) // In Idle disable bed and chamber
 			platform->Message(WarningMessage, "Heating disabled by safety timer");
 
 		lastCheckSafetyTimer = now;
