@@ -760,10 +760,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 
 			if (sparam == 2)
 			{
-				if (strncmp(dir.c_str(), "2:", 2) == 0) // usb file list is sorted in RPi
-					outBuf = reprap.GetFilesResponse(dir.c_str(), rparam, true);	// send the file list in JSON format
-				else
-					outBuf = reprap.GetSortedFilesResponse(dir.c_str(), rparam, true);	// send the sorted file list in JSON format
+				outBuf = reprap.GetFilesResponse(dir.c_str(), rparam, true);	// send the file list in JSON format
 
 				if (outBuf == nullptr)
 				{
@@ -782,7 +779,11 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			}
 			else if (sparam == 4) // Unsorted
 			{
-				outBuf = reprap.GetFilesResponse(dir.c_str(), rparam, true);	// send the file list in JSON format
+				if (strncmp(dir.c_str(), "2:", 2) == 0) // usb file list is sorted in RPi
+					outBuf = reprap.GetFilesResponse(dir.c_str(), rparam, true);	// send the file list in JSON format
+				else
+					outBuf = reprap.GetSortedFilesResponse(dir.c_str(), rparam, true);	// send the sorted file list in JSON format
+
 				if (outBuf == nullptr)
 				{
 					return false;

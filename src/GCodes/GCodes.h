@@ -670,6 +670,7 @@ private:
 	static constexpr const char* RESUME_G = "resume.g";
 	static constexpr const char* CANCEL_G = "cancel.g";
 	static constexpr const char* START_G = "start.g";
+	static constexpr const char* END_G = "end.g";
 	static constexpr const char* STOP_G = "stop.g";
 	static constexpr const char* SLEEP_G = "sleep.g";
 	static constexpr const char* CONFIG_OVERRIDE_G = "config-override.g";

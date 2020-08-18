@@ -1816,6 +1816,8 @@ void GCodes::DoFilePrint(GCodeBuffer& gb, const StringRef& reply)
 			   )
 			{
 				StopPrint(StopPrintReason::normalCompletion);
+
+				DoFileMacro(gb, END_G, false);
 			}
 		}
 		else

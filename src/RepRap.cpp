@@ -467,7 +467,7 @@ void RepRap::Spin()
 		if (status == 'B' or status == 'P' or status == 'D' or status == 'R' or status == 'T')
 			heat->ResetSafetyTimer();
 		else if (heat->CheckSafetyTimer(status == 'I')) // In Idle disable bed and chamber
-			platform->Message(WarningMessage, "Heating disabled by safety timer");
+			platform->Message(GenericMessage, "Heating disabled by safety timer");
 
 		lastCheckSafetyTimer = now;
 	}
@@ -870,6 +870,8 @@ void RepRap::DeleteHead(Head* head)
 		return;
 	}
 
+	int headNumber = head->GetNumber();
+
 	// Purge any references to this tool
 	MutexLocker lock(headListMutex);
 	for (Head **h = &headList; *h != nullptr; h = &((*h)->next))
@@ -883,6 +885,15 @@ void RepRap::DeleteHead(Head* head)
 
 	// Delete it
 	Head::Delete(head);
+
+    // Delete accessory files
+	String<MaxFilenameLength> filename;
+	for (int i = -1; i < 100; i++)
+	{
+		filename.printf(ACCESSORY_CONFIG_FILE, headNumber, i);
+
+		platform->DeleteSysFile(filename.c_str());
+	}
 }
 
 Head* RepRap::GetHead(int headNumber) const
@@ -980,6 +991,8 @@ void RepRap::DeletePad(Pad* pad)
 		return;
 	}
 
+	int padNumber = pad->GetNumber();
+
 	// Purge any references to this pad
 	MutexLocker lock(padListMutex);
 	for (Pad **p = &padList; *p != nullptr; p = &((*p)->next))
@@ -993,6 +1006,15 @@ void RepRap::DeletePad(Pad* pad)
 
 	// Delete it
 	Pad::Delete(pad);
+
+    // Delete accessory files
+	String<MaxFilenameLength> filename;
+	for (int i = -1; i < 100; i++)
+	{
+		filename.printf(ACCESSORY_CONFIG_FILE, i, padNumber);
+
+		platform->DeleteSysFile(filename.c_str());
+	}
 }
 
 void RepRap::SelectPad(GCodeBuffer& gb, Pad* pad)
@@ -2802,7 +2824,6 @@ OutputBuffer *RepRap::GetSortedFilesResponse(const char *dir, unsigned int start
 							nextFileInfo.lastModified = fileInfo.lastModified;
 
 							sameLastModifiedCount = 1; // first file found
-							findSameLastModified = true; // next search the same date
 						}
 					}
 				}
@@ -2831,6 +2852,8 @@ OutputBuffer *RepRap::GetSortedFilesResponse(const char *dir, unsigned int start
 					bytesLeft -= response->EncodeString(nextFileInfo.fileName, false, flagsDirs && nextFileInfo.isDirectory);
 				}
 
+				findSameLastModified = true; // next search the same date
+
 				++filesFound;
 			}
 			else if (findSameLastModified) // No another file with the same date found, cancel another search with the same date
@@ -2838,7 +2861,9 @@ OutputBuffer *RepRap::GetSortedFilesResponse(const char *dir, unsigned int start
 				findSameLastModified = false;
 			}
 			else // No another file found
+			{
 				break;
+			}
 		}
 	}
 
