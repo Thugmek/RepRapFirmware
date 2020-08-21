@@ -151,7 +151,7 @@ public:
 	OutputBuffer *GetTrilabStatusResponse(uint8_t type, ResponseSource source);
 	OutputBuffer *GetConfigResponse();
 	OutputBuffer *GetLegacyStatusResponse(uint8_t type, int seq);
-	OutputBuffer *GetFilesResponse(const char* dir, unsigned int startAt, bool flagsDirs);
+	OutputBuffer *GetFilesResponse(const char* dir, unsigned int startAt, bool flagsDirs, bool withTimestamp=false);
 	OutputBuffer *GetSortedFilesResponse(const char* dir, unsigned int startAt, bool flagsDirs);
 	OutputBuffer *GetFilelistResponse(const char* dir, unsigned int startAt);
 	bool GetFileInfoResponse(const char *filename, OutputBuffer *&response, bool quitEarly);

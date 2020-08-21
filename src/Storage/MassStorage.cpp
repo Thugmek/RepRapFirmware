@@ -187,7 +187,7 @@ void MassStorage::CloseAllFiles()
 // Open a directory to read a file list. Returns true if it contains any files, false otherwise.
 // If this returns true then the file system mutex is owned. The caller must subsequently release the mutex either
 // by calling FindNext until it returns false, or by calling AbandonFindNext.
-bool MassStorage::FindFirst(const char *directory, FileInfo &file_info)
+bool MassStorage::FindFirst(const char *directory, FileInfo &file_info, bool withTimestamp)
 {
 #if SUPPORT_RPI_USB_DRIVE
 	if (strncmp(directory, "2:", 2) == 0)
@@ -198,7 +198,7 @@ bool MassStorage::FindFirst(const char *directory, FileInfo &file_info)
 
 		StreamGCodeInput* serialInput = reprap.GetGCodes().serialInput;
 		serialInput->Reset(); // reset serial input buffer
-		reprap.GetPlatform().MessageF(BlockingUsbMessage, "M20 P\"%s\"\n", directory);
+		reprap.GetPlatform().MessageF(BlockingUsbMessage, "M%d P\"%s\"\n", withTimestamp ? 1020 : 20, directory);
 
 		serialInput->setTimeout(5000); // Timeout 5s
 		serialInput->ReadLine(rsp, sizeof(rsp) - 1);

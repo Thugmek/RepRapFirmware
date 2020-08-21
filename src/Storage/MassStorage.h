@@ -30,7 +30,7 @@ public:
 	static const char* GetMonthName(const uint8_t month);
 
 	FileStore* OpenFile(const char* filePath, OpenMode mode, uint32_t preAllocSize);
-	bool FindFirst(const char *directory, FileInfo &file_info);
+	bool FindFirst(const char *directory, FileInfo &file_info, bool withTimestamp=false);
 	bool FindNext(FileInfo &file_info);
 	void AbandonFindNext();
 	bool Delete(const char* filePath);

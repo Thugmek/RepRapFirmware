@@ -4835,6 +4835,38 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		}
 		break;
 
+	case 1020:		// List files on SD card
+		if (!LockFileSystem(gb))		// don't allow more than one at a time to avoid contention on output buffers
+		{
+			return false;
+		}
+		{
+			const int sparam = (gb.Seen('S')) ? gb.GetIValue() : 0;
+			const unsigned int rparam = (gb.Seen('R')) ? gb.GetUIValue() : 0;
+			String<MaxFilenameLength> dir;
+			if (gb.Seen('P'))
+			{
+				gb.GetPossiblyQuotedString(dir.GetRef());
+			}
+			else
+			{
+				dir.copy(platform.GetGCodeDir());
+			}
+
+
+			if (sparam == 0)
+			{
+				outBuf = reprap.GetFilesResponse(dir.c_str(), rparam, true, true);	// send file list with timestamp in JSON format
+
+				if (outBuf == nullptr)
+				{
+					return false;
+				}
+				outBuf->cat('\n');
+			}
+		}
+		break;
+
 	case 1408:
 		{
 			const int type = gb.Seen('S') ? gb.GetIValue() : 0;
