@@ -3545,6 +3545,10 @@ void GCodes::HandleProbingError(GCodeBuffer& gb)
 	{
 		StopPrint(StopPrintReason::abort);
 	}
+
+	reprap.SetAccessoryInitialized(false); // Next probing reset calibration, initialize accessory request
+
+	SaveConfigOverrideFile(gb, false); // Save initialize accessory request
 }
 
 // Home one or more of the axes
