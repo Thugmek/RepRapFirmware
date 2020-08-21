@@ -309,13 +309,21 @@ void RepRap::Init()
 			}
 
 			powerFail = platform->SysFileExists(RESUME_AFTER_POWER_FAIL_FILE);
-			if (!powerFail) // Not restore after power lost
-			{
+			// if (!powerFail) // Not restore after power lost
+			// {
 				if (platform->DirectoryExists(USB_DIR)) // USB directory exists
 				{
+					FileInfo fileInfo;
+					bool gotFile = platform->GetMassStorage()->FindFirst(USB_DIR, fileInfo);
+					while (gotFile)
+					{
+						platform->Delete(USB_DIR, fileInfo.fileName.c_str());
+
+						gotFile = platform->GetMassStorage()->FindNext(fileInfo);
+					}
 					platform->DeleteDirectory(USB_DIR); // Remove USB directory
 				}
-			}
+			// }
 		}
 		else
 		{
@@ -2678,7 +2686,7 @@ OutputBuffer *RepRap::GetLegacyStatusResponse(uint8_t type, int seq)
 
 // Get the list of files in the specified directory in JSON format.
 // If flagDirs is true then we prefix each directory with a * character.
-OutputBuffer *RepRap::GetFilesResponse(const char *dir, unsigned int startAt, bool flagsDirs)
+OutputBuffer *RepRap::GetFilesResponse(const char *dir, unsigned int startAt, bool flagsDirs, bool withTimestamp)
 {
 	// Need something to write to...
 	OutputBuffer *response;
@@ -2706,13 +2714,13 @@ OutputBuffer *RepRap::GetFilesResponse(const char *dir, unsigned int startAt, bo
 		err = 0;
 		FileInfo fileInfo;
 		unsigned int filesFound = 0;
-		bool gotFile = platform->GetMassStorage()->FindFirst(dir, fileInfo);
+		bool gotFile = platform->GetMassStorage()->FindFirst(dir, fileInfo, withTimestamp);
 
 		size_t bytesLeft = OutputBuffer::GetBytesLeft(response);	// don't write more bytes than we can
 
 		while (gotFile)
 		{
-			if (fileInfo.fileName[0] != '.')						// ignore Mac resource files and Linux hidden files
+			if (fileInfo.fileName[0] != '.') // ignore Mac resource files and Linux hidden files
 			{
 				if (filesFound >= startAt)
 				{
@@ -2731,7 +2739,18 @@ OutputBuffer *RepRap::GetFilesResponse(const char *dir, unsigned int startAt, bo
 						bytesLeft -= response->cat(',');
 					}
 
-					bytesLeft -= response->EncodeString(fileInfo.fileName, false, flagsDirs && fileInfo.isDirectory);
+					if (withTimestamp)
+					{
+						String<MaxFilenameLength + 20> fileName;
+
+						fileName.printf("%s:%llu", fileInfo.fileName.c_str(), fileInfo.lastModified);
+
+						bytesLeft -= response->EncodeString(fileName, false, flagsDirs && fileInfo.isDirectory);
+					}
+					else
+					{
+						bytesLeft -= response->EncodeString(fileInfo.fileName, false, flagsDirs && fileInfo.isDirectory);
+					}
 				}
 				++filesFound;
 			}
