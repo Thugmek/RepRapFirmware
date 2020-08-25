@@ -3764,17 +3764,17 @@ void Platform::RawMessage(MessageType type, const char *message)
 
 	if ((type & BluetoothMessage) != 0)
 	{
-		AppendAuxReply(message, message[0] == '{' || (type & RawMessageFlag) != 0);
+		AppendAuxReply(message, false);
 	}
 
 	// Send the message to the destinations
 	if ((type & ImmediateLcdMessage) != 0)
 	{
-		SendAuxMessage(message);
+		// SendAuxMessage(message); // 24.8.2020 blocking of direct communication outside resp
 	}
 	else if ((type & LcdMessage) != 0)
 	{
-		AppendAuxReply(message, message[0] == '{' || (type & RawMessageFlag) != 0);
+		// AppendAuxReply(message, message[0] == '{' || (type & RawMessageFlag) != 0);
 	}
 
 	if ((type & HttpMessage) != 0)
@@ -3893,7 +3893,7 @@ void Platform::Message(const MessageType type, OutputBuffer *buffer)
 
 		if ((type & (LcdMessage | ImmediateLcdMessage)) != 0)
 		{
-			AppendAuxReply(buffer, ((*buffer)[0] == '{') || (type & RawMessageFlag) != 0);
+			// AppendAuxReply(buffer, ((*buffer)[0] == '{') || (type & RawMessageFlag) != 0);
 		}
 
 		if ((type & HttpMessage) != 0)
@@ -3941,12 +3941,12 @@ void Platform::MessageF(MessageType type, const char *fmt, va_list vargs)
 	String<FormatStringLength> formatString;
 	if ((type & ErrorMessageFlag) != 0)
 	{
-		formatString.copy("Error: ");
+		formatString.copy("error: ");
 		formatString.vcatf(fmt, vargs);
 	}
 	else if ((type & WarningMessageFlag) != 0)
 	{
-		formatString.copy("Warning: ");
+		formatString.copy("warning: ");
 		formatString.vcatf(fmt, vargs);
 	}
 	else

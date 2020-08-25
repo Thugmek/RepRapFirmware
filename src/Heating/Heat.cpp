@@ -515,7 +515,7 @@ void Heat::StartAutoTune(size_t heater, float temperature, float maxPwm, const S
 	else
 	{
 		// Trying to start a new auto tune, but we are already tuning a heater
-		reply.printf("Error: cannot start auto tuning heater %u because heater %d is being tuned", heater, heaterBeingTuned);
+		reply.printf("error: cannot start auto tuning heater %u because heater %d is being tuned", heater, heaterBeingTuned);
 	}
 }
 

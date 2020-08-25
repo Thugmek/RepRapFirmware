@@ -32,14 +32,14 @@ enum MessageType : uint32_t
 	// Common combinations
 	NoDestinationMessage = 0,												// A message that is going nowhere
 	DebugMessage = BlockingUsbMessage,										// A debug message to send in blocking mode to USB
-	GenericMessage = UsbMessage | LcdMessage | HttpMessage | TelnetMessage,	// A message that is to be sent to the web, Telnet, USB and panel
+	GenericMessage = UsbMessage | BluetoothMessage | HttpMessage | TelnetMessage,	// A message that is to be sent to the web, Telnet, USB and panel
 	LoggedGenericMessage = GenericMessage | LogMessage,						// A GenericMessage that is also logged
 	DirectLcdMessage = LcdMessage | RawMessageFlag,							// Direct message to LCD
  	ErrorMessage = GenericMessage | LogMessage | ErrorMessageFlag,			// An error message
 	WarningMessage = GenericMessage | LogMessage | WarningMessageFlag,		// A warning message
 	FirmwareUpdateMessage = UsbMessage | ImmediateLcdMessage,				// A message that conveys progress of a firmware update
 	FirmwareUpdateErrorMessage = FirmwareUpdateMessage | ErrorMessageFlag,	// A message that reports an error during a firmware update
-	NetworkInfoMessage = UsbMessage | LcdMessage | LogMessage,			 	// A message that conveys information about the state of the network interface
+	NetworkInfoMessage = UsbMessage | BluetoothMessage | LogMessage,			 	// A message that conveys information about the state of the network interface
 };
 
 inline MessageType AddError(MessageType mt)

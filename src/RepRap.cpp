@@ -777,7 +777,7 @@ void RepRap::PrintTool(int toolNumber, const StringRef& reply) const
 	}
 	else
 	{
-		reply.copy("Error: Attempt to print details of non-existent tool.\n");
+		reply.copy("error: Attempt to print details of non-existent tool.\n");
 	}
 }
 
@@ -945,7 +945,7 @@ void RepRap::PrintHead(int headNumber, const StringRef& reply) const
 	}
 	else
 	{
-		reply.copy("Error: Attempt to print details of non-existent head\n");
+		reply.copy("error: Attempt to print details of non-existent head\n");
 	}
 }
 
@@ -1060,7 +1060,7 @@ void RepRap::PrintPad(int padNumber, const StringRef& reply) const
 	}
 	else
 	{
-		reply.copy("Error: Attempt to print details of non-existent pad\n");
+		reply.copy("error: Attempt to print details of non-existent pad\n");
 	}
 }
 
@@ -3107,10 +3107,10 @@ void RepRap::SetMessage(const char *msg)
 	message.copy(msg);
 	++messageSequence;
 
-	if (platform->HaveAux())
-	{
-		platform->SendAuxMessage(msg);
-	}
+	// if (platform->HaveAux()) // 24.8.2020 do not send directly on BT
+	// {
+	// 	platform->SendAuxMessage(msg);
+	// }
 }
 
 // Display a message box on the web interface

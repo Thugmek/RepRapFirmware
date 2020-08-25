@@ -231,7 +231,7 @@ void Webserver::Spin()
 		{
 			// We failed to find a transaction for a reading connection.
 			// This should never happen, but if it does, terminate this connection instantly
-			platform->Message(UsbMessage, "Error: Transaction for reading connection not found\n");
+			platform->Message(UsbMessage, "error: Transaction for reading connection not found\n");
 			Network::Terminate(readingConnection);
 		}
 		network->Unlock();		// unlock LWIP again
@@ -305,7 +305,7 @@ void Webserver::ConnectionLost(Connection conn)
 	}
 	else
 	{
-		platform->MessageF(GenericMessage, "Error: Webserver should handle disconnect event at local port %d, but no handler was found!\n", localPort);
+		platform->MessageF(GenericMessage, "error: Webserver should handle disconnect event at local port %d, but no handler was found!\n", localPort);
 		return;
 	}
 
@@ -382,7 +382,7 @@ bool ProtocolInterpreter::StartUpload(FileStore *file, const char *fileName)
 		return true;
 	}
 
-	platform->Message(GenericMessage, "Error: Could not open file while starting upload!\n");
+	platform->Message(GenericMessage, "error: Could not open file while starting upload!\n");
 	return false;
 }
 
@@ -413,7 +413,7 @@ void ProtocolInterpreter::DoFastUpload()
 		network->Unlock();
 		if (!fileBeingUploaded.Write(buffer, len))
 		{
-			platform->Message(GenericMessage, "Error: Could not write upload data!\n");
+			platform->Message(GenericMessage, "error: Could not write upload data!\n");
 			CancelUpload();
 
 			while (!network->Lock());
@@ -435,14 +435,14 @@ bool ProtocolInterpreter::FinishUpload(uint32_t fileLength)
 	if (uploadState == uploadOK && !fileBeingUploaded.Flush())
 	{
 		uploadState = uploadError;
-		platform->Message(GenericMessage, "Error: Could not flush remaining data while finishing upload!\n");
+		platform->Message(GenericMessage, "error: Could not flush remaining data while finishing upload!\n");
 	}
 
 	// Check the file length is as expected
 	if (uploadState == uploadOK && fileLength != 0 && fileBeingUploaded.Length() != fileLength)
 	{
 		uploadState = uploadError;
-		platform->MessageF(GenericMessage, "Error: Uploaded file size is different (%" PRIu32 " vs. expected %" PRIu32 " bytes)!\n", fileBeingUploaded.Length(), fileLength);
+		platform->MessageF(GenericMessage, "error: Uploaded file size is different (%" PRIu32 " vs. expected %" PRIu32 " bytes)!\n", fileBeingUploaded.Length(), fileLength);
 	}
 
 	// Close the file
@@ -558,7 +558,7 @@ void Webserver::HttpInterpreter::DoFastUpload()
 		const bool success = fileBeingUploaded.Write(buffer, len);
 		if (!success)
 		{
-			platform->Message(GenericMessage, "Error: Could not write upload data!\n");
+			platform->Message(GenericMessage, "error: Could not write upload data!\n");
 			CancelUpload();
 
 			while (!network->Lock()) { }

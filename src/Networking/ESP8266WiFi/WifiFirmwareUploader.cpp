@@ -722,7 +722,7 @@ void WifiFirmwareUploader::Spin()
 		}
 		else
 		{
-			MessageF("Error: Installation failed due to %s error\n", resultMessages[(size_t)uploadResult]);
+			MessageF("error: Installation failed due to %s error\n", resultMessages[(size_t)uploadResult]);
 			// Not safe to restart the network
 			interface.ResetWiFi();
 		}

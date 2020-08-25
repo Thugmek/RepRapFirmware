@@ -1924,6 +1924,7 @@ void GCodes::CheckFilament()
 {
 	if (   lastFilamentError != FilamentSensorStatus::ok			// check for a filament error
 		&& IsReallyPrinting()
+		&& (GetTotalRawExtrusion() > 0.0)
 		&& autoPauseGCode->IsCompletelyIdle()
 		&& LockMovement(*autoPauseGCode)							// need to lock movement before executing the pause macro
 	   )

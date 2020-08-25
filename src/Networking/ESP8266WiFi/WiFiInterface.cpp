@@ -191,7 +191,7 @@ GCodeResult WiFiInterface::EnableProtocol(NetworkProtocol protocol, int port, in
 {
 	if (secure != 0 && secure != -1)
 	{
-		reply.copy("Error: this firmware does not support TLS");
+		reply.copy("error: this firmware does not support TLS");
 	}
 	else if (protocol < NumProtocols)
 	{
@@ -510,7 +510,7 @@ void WiFiInterface::Spin(bool full)
 						// Set the hostname before anything else is done
 						if (SendCommand(NetworkCommand::networkSetHostName, 0, 0, reprap.GetNetwork().GetHostname(), HostNameLength, nullptr, 0) != ResponseEmpty)
 						{
-							reprap.GetPlatform().Message(NetworkInfoMessage, "Error: Could not set WiFi hostname\n");
+							reprap.GetPlatform().Message(NetworkInfoMessage, "error: Could not set WiFi hostname\n");
 						}
 
 						state = NetworkState::active;
@@ -520,7 +520,7 @@ void WiFiInterface::Spin(bool full)
 					{
 						// Something went wrong, maybe a bad firmware image was flashed
 						// Disable the WiFi chip again in this case
-						platform.MessageF(NetworkInfoMessage, "Error: Failed to initialise WiFi module, code %" PRIi32 "\n", rc);
+						platform.MessageF(NetworkInfoMessage, "error: Failed to initialise WiFi module, code %" PRIi32 "\n", rc);
 						Stop();
 					}
 				}
@@ -1128,7 +1128,7 @@ void WiFiInterface::UpdateHostname(const char *hostname)
 	{
 		if (SendCommand(NetworkCommand::networkSetHostName, 0, 0, hostname, HostNameLength, nullptr, 0) != ResponseEmpty)
 		{
-			platform.Message(GenericMessage, "Error: Could not set WiFi hostname\n");
+			platform.Message(GenericMessage, "error: Could not set WiFi hostname\n");
 		}
 	}
 }

@@ -546,18 +546,18 @@ void PID::StartAutoTune(float targetTemp, float maxPwm, const StringRef& reply)
 	// Starting an auto tune
 	if (!model.IsEnabled())
 	{
-		reply.printf("Error: heater %d cannot be auto tuned while it is disabled", heater);
+		reply.printf("error: heater %d cannot be auto tuned while it is disabled", heater);
 	}
 	else if (lastPwm > 0.0 || GetAveragePWM() > 0.02)
 	{
-		reply.printf("Error: heater %d must be off and cold before auto tuning it", heater);
+		reply.printf("error: heater %d must be off and cold before auto tuning it", heater);
 	}
 	else
 	{
 		const TemperatureError err = ReadTemperature();
 		if (err != TemperatureError::success)
 		{
-			reply.printf("Error: heater %d reported error '%s' at start of auto tuning", heater, TemperatureErrorString(err));
+			reply.printf("error: heater %d reported error '%s' at start of auto tuning", heater, TemperatureErrorString(err));
 		}
 		else
 		{
