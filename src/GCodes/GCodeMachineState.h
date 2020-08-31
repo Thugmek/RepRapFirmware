@@ -116,6 +116,7 @@ public:
 	uint8_t toolChangeParam;
 	int16_t newToolNumber;
 	int macroIntParam0;
+	int codeRunning;
 	unsigned int
 		drivesRelative : 1,
 		axesRelative : 1,

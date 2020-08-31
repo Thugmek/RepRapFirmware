@@ -3511,6 +3511,7 @@ bool GCodes::DoFileMacro(GCodeBuffer& gb, const char* fileName, bool reportMissi
 	fileInput->Reset(gb.MachineState().fileState);
 	gb.MachineState().macroIntParam0 = intParam;
 	gb.MachineState().doingFileMacro = true;
+	gb.MachineState().codeRunning = codeRunning;
 	gb.MachineState().runningM501 = (codeRunning == 501);
 	gb.MachineState().runningM502 = (codeRunning == 502);
 	gb.MachineState().runningInitializeAccessories = (codeRunning == 1802);

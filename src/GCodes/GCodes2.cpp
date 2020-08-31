@@ -358,7 +358,11 @@ bool GCodes::HandleGcode(GCodeBuffer& gb, const StringRef& reply)
 			switch(sparam)
 			{
 			case 0:		// probe and save height map
-				result = ProbeGrid(gb, reply);
+				if (platform.SysFileExists(BED_LEVELING_G) && gb.MachineState().codeRunning != 29)
+					DoFileMacro(gb, BED_LEVELING_G, true, 29);	// Try to execute bed-leveling.g
+				else
+					result = ProbeGrid(gb, reply);
+
 				break;
 
 			case 1:		// load height map file
