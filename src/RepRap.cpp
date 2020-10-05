@@ -757,15 +757,18 @@ void RepRap::SelectTool(int toolNumber, bool simulating)
 		}
 	}
 
-
+	bool toolChange = false;
 	if (currentTool == nullptr || newTool == nullptr || currentTool->GetHeadNumber() != newTool->GetHeadNumber())
 	{
+		toolChange = true;
+
 		SetAccessoryInitialized(false);
 	}
 
 	currentTool = newTool;
 
-	platform->ReadAccessoryConfig();
+	if (toolChange)
+		platform->ReadAccessoryConfig();
 }
 
 void RepRap::PrintTool(int toolNumber, const StringRef& reply) const

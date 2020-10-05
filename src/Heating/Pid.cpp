@@ -533,7 +533,7 @@ float PID::GetAveragePWM() const
 float PID::GetExpectedHeatingRate() const
 {
 	// In the following we allow for the gain being only 75% of what we think it should be, to avoid false alarms
-	const float maxTemperatureRise = 0.75 * model.GetGain() * GetAveragePWM();		// this is the highest temperature above ambient we expect the heater can reach at this PWM
+	const float maxTemperatureRise = 0.65 * model.GetGain() * GetAveragePWM();		// this is the highest temperature above ambient we expect the heater can reach at this PWM
 	const float initialHeatingRate = maxTemperatureRise/model.GetTimeConstant();	// this is the expected heating rate at ambient temperature
 	return (maxTemperatureRise >= 20.0)
 			? (maxTemperatureRise + NormalAmbientTemperature - temperature) * initialHeatingRate/maxTemperatureRise

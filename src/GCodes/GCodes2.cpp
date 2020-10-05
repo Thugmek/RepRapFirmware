@@ -1551,6 +1551,13 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			// because any slicer that uses M109 doesn't understand that there are separate active and standby temperatures.
 			if (simulationMode == 0)
 			{
+				if (gb.Seen('B'))
+				{
+					float activeTemperature = applicableTool->GetToolHeaterActiveTemperature(0);
+					if (temperature < activeTemperature)
+						temperature = activeTemperature;
+				}
+
 				SetToolHeaters(applicableTool, temperature, true);
 			}
 
@@ -1909,11 +1916,18 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			}
 			else if (currentHeater >= 0)
 			{
-				temperature = reprap.GetHeat().GetLastActiveTemperature(currentHeater); // Restore last temperature
+				temperature = heat.GetLastActiveTemperature(currentHeater); // Restore last temperature
 				seen = true;
 			}
 			if (seen)
 			{
+				if (gb.Seen('B'))
+				{
+					float activeTemperature = heat.GetActiveTemperature(currentHeater);
+					if (temperature < activeTemperature)
+						temperature = activeTemperature;
+				}
+
 				if (currentHeater < 0)
 				{
 					if (temperature > 0.0)		// turning off a non-existent bed or chamber heater is not an error
@@ -2039,6 +2053,13 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				{
 					waitWhenCooling = false;
 					temperature = reprap.GetHeat().GetLastActiveTemperature(heater); // Restore last temperature
+				}
+
+				if (gb.Seen('B'))
+				{
+					float activeTemperature = reprap.GetHeat().GetActiveTemperature(heater);
+					if (temperature < activeTemperature)
+						temperature = activeTemperature;
 				}
 
 				reprap.GetHeat().SetActiveTemperature(heater, temperature);
