@@ -1954,7 +1954,7 @@ void GCodes::DoEmergencyStop()
 {
 	reprap.EmergencyStop();
 	Reset();
-	platform.Message(GenericMessage, "Emergency Stop! Reset the controller to continue.");
+	platform.Message(GenericMessage, "Emergency Stop! Reset the controller to continue\n");
 }
 
 // Pause the print. Before calling this, check that we are doing a file print that isn't already paused and get the movement lock.

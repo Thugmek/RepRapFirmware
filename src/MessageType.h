@@ -18,7 +18,7 @@ enum MessageType : uint32_t
 	BlockingUsbMessage = 0x02,			// A message to be sent to USB in blocking mode
 	LcdMessage = 0x04,					// A message that is to be sent to the panel
 	ImmediateLcdMessage = 0x08,			// A message to be sent to LCD in immediate mode
-	HttpMessage = 0x10,					// A message that is to be sent to the web (HTTP)
+	HttpMessage = 0x10,	// A message that is to be sent to the web (HTTP)
 	TelnetMessage = 0x20,				// A message that is to be sent to a Telnet client
 	AuxMessage = 0x40,					// A message that is to be sent to the second auxiliary device
 	LogMessage = 0x80,					// A message to be written to the log file

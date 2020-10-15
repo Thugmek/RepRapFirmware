@@ -3820,7 +3820,7 @@ void Platform::RawMessage(MessageType type, const char *message)
 		}
 		// We no longer flush afterwards
 	}
-	else if ((type & UsbMessage) != 0)
+	else if (((type & UsbMessage) != 0) or ((type & HttpMessage) != 0))
 	{
 		// Message that is to be sent via the USB line (non-blocking)
 		MutexLocker lock(usbMutex);
@@ -3828,6 +3828,13 @@ void Platform::RawMessage(MessageType type, const char *message)
 		if (!reprap.GetScanner().IsRegistered() || reprap.GetScanner().DoingGCodes())
 #endif
 		{
+			String<FormatStringLength> formatString;
+
+			if ((type & HttpMessage) != 0)
+				formatString.printf("HttpConsole: %s", message);
+			else
+				formatString.copy(message);
+
 			// Ensure we have a valid buffer to write to that isn't referenced for other destinations
 			OutputBuffer *usbOutputBuffer = usbOutput.GetLastItem();
 			if (usbOutputBuffer == nullptr || usbOutputBuffer->IsReferenced())
@@ -3841,7 +3848,7 @@ void Platform::RawMessage(MessageType type, const char *message)
 			}
 
 			// Append the message string
-			usbOutputBuffer->cat(message);
+			usbOutputBuffer->cat(formatString.c_str());
 		}
 	}
 }
