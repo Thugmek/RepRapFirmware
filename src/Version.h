@@ -11,7 +11,7 @@
 
 #ifndef VERSION
 #ifdef RTOS
-# define MAIN_VERSION	"2.04trilab31"
+# define MAIN_VERSION	"2.04trilab32"
 #else
 # define MAIN_VERSION	"1.25+1"
 #endif
@@ -20,7 +20,7 @@
 #endif
 
 #ifndef DATE
-# define DATE "2020-10-14"
+# define DATE "2020-10-15"
 #endif
 
 #define AUTHORS "reprappro, dc42, chrishamm, t3p3, dnewman, printm3d, mat100"

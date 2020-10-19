@@ -523,11 +523,11 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		// Don't allow M0 or M1 to stop a print, unless the print is paused or the command comes from the file being printed itself.
 		if (reprap.GetPrintMonitor().IsPrinting() && &gb == fileGCode && !IsPaused())
 		{
-			if (strcmp(".mcf", reprap.GetPrintMonitor().GetPrintingFilename()) != 0)
+			if (reprap.GetPrintMonitor().IsPalette2Printing())
 			{
 				ForwardToUsb(gb, false); // no source info
 
-				DoPause(gb, PauseReason::palette2, nullptr);
+				DoPause(gb, PauseReason::palette2, "Printing paused, please follow the instructions on Palette screen");
 				result = GCodeResult::ok;
 			}
 		}
@@ -546,20 +546,21 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		{
 			const bool wasPaused = isPaused;				// isPaused gets cleared by CancelPrint
 			const bool wasSimulating = IsSimulating();		// simulationMode may get cleared by CancelPrint
+			const bool wasPalette2 = reprap.GetPrintMonitor().IsPalette2Printing();
 			isWaiting = cancelWait = false;					// we may have been waiting for temperatures to be reached
 			StopPrint((&gb == fileGCode) ? StopPrintReason::normalCompletion : StopPrintReason::userCancelled);
 
 			if (!wasSimulating)								// don't run any macro files or turn heaters off etc. if we were simulating before we stopped the print
 			{
 				// If we are cancelling a paused print with M0 and we are homed and cancel.g exists then run it and do nothing else
-				if (wasPaused && code == 0 && AllAxesAreHomed() && DoFileMacro(gb, CANCEL_G, false))
+				if (wasPaused && code == 0 && AllAxesAreHomed() && DoFileMacro(gb, wasPalette2 ? CANCEL_PALETTE2_G : CANCEL_G, false))
 				{
 					break;
 				}
 
 				const bool leaveHeatersOn = (gb.Seen('H') && gb.GetIValue() > 0);
 				gb.SetState((leaveHeatersOn) ? GCodeState::stoppingWithHeatersOn : GCodeState::stoppingWithHeatersOff);
-				(void)DoFileMacro(gb, (code == 0) ? STOP_G : SLEEP_G, false);
+				(void)DoFileMacro(gb, (code == 0) ? wasPalette2 ? STOP_PALETTE2_G : STOP_G: wasPalette2 ? SLEEP_PALETTE2_G : SLEEP_G, false);
 			}
 		}
 		break;

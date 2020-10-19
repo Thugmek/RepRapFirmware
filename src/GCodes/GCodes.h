@@ -673,6 +673,10 @@ private:
 	static constexpr const char* END_G = "end.g";
 	static constexpr const char* STOP_G = "stop.g";
 	static constexpr const char* SLEEP_G = "sleep.g";
+	static constexpr const char* CANCEL_PALETTE2_G = "cancel-palette2.g";
+	static constexpr const char* STOP_PALETTE2_G = "stop-palette2.g";
+	static constexpr const char* SLEEP_PALETTE2_G = "sleep-palette2.g";
+	static constexpr const char* END_PALETTE2_G = "end-palette2.g";
 	static constexpr const char* CONFIG_OVERRIDE_G = "config-override.g";
 	static constexpr const char* DEPLOYPROBE_G = "deployprobe.g";
 	static constexpr const char* RETRACTPROBE_G = "retractprobe.g";

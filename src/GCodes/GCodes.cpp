@@ -847,7 +847,6 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 	case GCodeState::waitingForPalette2_2:
 		if (LockMovementAndWaitForStandstill(gb))
 		{
-			platform.MessageF(LoggedGenericMessage, "%s\n", "Printing paused, please follow the instructions on Palette 2's screen");
 			gb.SetState(GCodeState::normal);
 		}
 		break;
@@ -1815,9 +1814,11 @@ void GCodes::DoFilePrint(GCodeBuffer& gb, const StringRef& reply)
 				&& IsCodeQueueIdle()									// must also wait until deferred command queue has caught up
 			   )
 			{
+				const bool wasPalette2 = reprap.GetPrintMonitor().IsPalette2Printing();
+
 				StopPrint(StopPrintReason::normalCompletion);
 
-				DoFileMacro(gb, END_G, false);
+				DoFileMacro(gb, wasPalette2 ? END_PALETTE2_G : END_G, false);
 			}
 		}
 		else

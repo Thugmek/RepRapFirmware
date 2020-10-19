@@ -66,6 +66,8 @@ class PrintMonitor
 		const char *GetPrintingFilename() const { return (isPrinting) ? filenameBeingPrinted.c_str() : nullptr; }
 		bool GetPrintingFileInfo(GCodeFileInfo& info);
 
+		bool IsPalette2Printing() const;
+
 	private:
 		Platform& platform;
 		GCodes& gCodes;
@@ -98,6 +100,7 @@ class PrintMonitor
 };
 
 inline bool PrintMonitor::IsPrinting() const { return isPrinting; }
+inline bool PrintMonitor::IsPalette2Printing() const { return isPrinting && (strcmp(".mcf", GetPrintingFilename()) != 0); }
 inline unsigned int PrintMonitor::GetCurrentLayer() const { return currentLayer; }
 inline float PrintMonitor::GetCurrentLayerTime() const { return (lastLayerChangeTime > 0.0) ? (GetPrintDuration() - lastLayerChangeTime) : 0.0; }
 inline float PrintMonitor::GetFirstLayerHeight() const { return printingFileParsed ? printingFileInfo.firstLayerHeight : 0.0; }
