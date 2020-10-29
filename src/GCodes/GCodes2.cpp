@@ -939,6 +939,11 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				else
 #endif
 				{
+					if (reprap.GetPrintMonitor().IsPalette2Printing())
+					{
+						reprap.ClearAlert(); // Clear please follow the instructions on Palette screen alert
+					}
+
 					gb.SetState(GCodeState::resuming1);
 					if (AllAxesAreHomed())
 					{
