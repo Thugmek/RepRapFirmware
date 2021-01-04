@@ -53,7 +53,7 @@ class PrintMonitor
 
 		// Return an estimate in seconds based on a specific estimation method
 		float EstimateTimeLeft(PrintEstimationMethod method) const;
-		float FractionOfFilePrinted() const;
+		float FractionOfFilePrinted(bool useLayerZ = false) const;
 
 		// Provide some information about the file being printed
 		unsigned int GetCurrentLayer() const;

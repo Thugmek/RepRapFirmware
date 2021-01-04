@@ -402,7 +402,7 @@ float PrintMonitor::EstimateTimeLeft(PrintEstimationMethod method) const
 	return 0.0;
 }
 
-float PrintMonitor::FractionOfFilePrinted() const
+float PrintMonitor::FractionOfFilePrinted(bool useLayerZ) const
 {
 	// Sum up the filament usage and the filament needed
 	float totalFilamentNeeded = 0.0;
@@ -413,7 +413,7 @@ float PrintMonitor::FractionOfFilePrinted() const
 	const float extrRawTotal = gCodes.GetTotalRawExtrusion();
 
 	// If we have a reasonable amount of filament extruded, calculate estimated times left
-	if (totalFilamentNeeded > 0.0)
+	if (totalFilamentNeeded > 0.0 and not useLayerZ)
 	{
 		// Do we have more total filament extruded than reported by the file
 		if (extrRawTotal >= totalFilamentNeeded)
@@ -422,7 +422,7 @@ float PrintMonitor::FractionOfFilePrinted() const
 		}
 		return (extrRawTotal / totalFilamentNeeded * 100.0);
 	}
-	else if (printingFileInfo.objectHeight > 0) {
+	else if (printingFileInfo.objectHeight > 0 or useLayerZ) {
 		if (lastLayerZ >= printingFileInfo.objectHeight)
 		{
 			return 100.0;

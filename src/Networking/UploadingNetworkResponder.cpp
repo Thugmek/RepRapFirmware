@@ -78,7 +78,7 @@ void UploadingNetworkResponder::FinishUpload(uint32_t fileLength, time_t fileLas
 	else if (gotCrc && expectedCrc != fileBeingUploaded.GetCrc32())
 	{
 		uploadError = true;
-		GetPlatform().MessageF(ErrorMessage, "Uploaded file CRC is different (%08" PRIx32 " vs. expected %08" PRIx32 ")\n", fileBeingUploaded.GetCrc32(), expectedCrc);
+		GetPlatform().MessageF(ErrorMessage, "Uploaded file CRC is different\n");
 	}
 
 	// Close the file

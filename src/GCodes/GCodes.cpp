@@ -176,6 +176,8 @@ void GCodes::Init()
 	isRetracted = false;
 	lastAuxStatusReportType = -1;						// no status reports requested yet
 
+	tuningMode = 0;
+
 	laserMaxPower = DefaultMaxLaserPower;
 	laserPowerSticky = false;
 
@@ -2637,7 +2639,16 @@ bool GCodes::LoadExtrusionAndFeedrateFromGCode(GCodeBuffer& gb, bool isPrintingM
 			if (mc == 1)
 			{
 				// There may be multiple extruders present but only one value has been specified, so use mixing
-				const float moveArg = gb.ConvertDistance(eMovement[0]);
+				float moveArg = gb.ConvertDistance(eMovement[0]);
+				if (reprap.GetPrintMonitor().IsPrinting() and tuningMode == 2 and abs(moveArg) == tuningGcodeVal) {
+					float sign = moveArg >= 0 ? 1.0 : -1.0;
+					moveArg = sign * (tuningStartVal + ((tuningEndVal - tuningStartVal) / 100.0 * reprap.GetPrintMonitor().FractionOfFilePrinted(true)));
+				}
+				else if (reprap.GetPrintMonitor().IsPrinting() and tuningMode == 3 and abs(moveArg) == tuningGcodeVal) {
+					moveBuffer.feedRate = tuningStartVal + ((tuningEndVal - tuningStartVal) / 100.0 * reprap.GetPrintMonitor().FractionOfFilePrinted(true));
+					moveBuffer.usingStandardFeedrate = true;
+					platform.MessageF(BlockingUsbMessage, "%.2f\n", (double)moveBuffer.feedRate);
+				}
 				float requestedExtrusionAmount;
 				if (gb.MachineState().drivesRelative)
 				{
@@ -2859,6 +2870,13 @@ const char* GCodes::DoStraightMove(GCodeBuffer& gb, bool isCoordinated)
 
 			SetBit(axesMentioned, axis);
 			const float moveArg = gb.GetDistance();
+			if (reprap.GetPrintMonitor().IsPrinting() and tuningMode == 1 and axis == Z_AXIS and moveArg > 0.0)
+			{
+				float temperature = round(tuningStartVal + ((tuningEndVal - tuningStartVal) / 100.0 * reprap.GetPrintMonitor().FractionOfFilePrinted(true)));
+				SetToolHeaters(reprap.GetCurrentOrDefaultTool(), temperature, true);
+
+				platform.MessageF(BlockingUsbMessage, "%d\n", (int)temperature);
+			}
 			if (moveBuffer.moveType != 0)
 			{
 				// Special moves update the move buffer directly, bypassing the user coordinates
@@ -5083,6 +5101,8 @@ void GCodes::StopPrint(StopPrintReason reason)
 {
 	segmentsLeft = 0;
 	isPaused = pausePending = filamentChangePausePending = false;
+
+	tuningMode = 0;
 
 	FileData& fileBeingPrinted = fileGCode->OriginalMachineState().fileState;
 

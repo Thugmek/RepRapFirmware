@@ -1526,7 +1526,10 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			else
 			{
 				if (reprap.GetCurrentTool() != nullptr)
-					temperature = reprap.GetHeat().GetLastActiveTemperature(reprap.GetCurrentTool()->Heater(0)); // Restore last temperature
+					if (reprap.GetPrintMonitor().IsPrinting())
+						temperature = reprap.GetHeat().GetLastActiveTemperature(reprap.GetCurrentTool()->Heater(0)); // Restore last temperature
+					else
+						temperature = 0.0;
 				else
 					break; // no target temperature given
 			}
@@ -1922,7 +1925,11 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			}
 			else if (currentHeater >= 0)
 			{
-				temperature = heat.GetLastActiveTemperature(currentHeater); // Restore last temperature
+				if (reprap.GetPrintMonitor().IsPrinting())
+					temperature = heat.GetLastActiveTemperature(currentHeater); // Restore last temperature
+				else
+					temperature = 0.0;
+
 				seen = true;
 			}
 			if (seen)
@@ -2058,7 +2065,11 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				else
 				{
 					waitWhenCooling = false;
-					temperature = reprap.GetHeat().GetLastActiveTemperature(heater); // Restore last temperature
+
+					if (reprap.GetPrintMonitor().IsPrinting())
+						temperature = reprap.GetHeat().GetLastActiveTemperature(heater); // Restore last temperature
+					else
+						temperature = 0.0;
 				}
 
 				if (gb.Seen('B'))
@@ -4927,6 +4938,15 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 
 	case 1820: // Define pad
 		result = ManagePad(gb, reply);
+		break;
+
+	case 1990:
+		{
+			tuningMode = (gb.Seen('P')) ? gb.GetUIValue() : 0;
+			tuningGcodeVal = (gb.Seen('R')) ? gb.GetFValue() : 0.0;
+			tuningStartVal = (gb.Seen('S')) ? gb.GetFValue() : 0.0;
+			tuningEndVal = (gb.Seen('E')) ? gb.GetFValue() : 0.0;
+		}
 		break;
 
 	default:

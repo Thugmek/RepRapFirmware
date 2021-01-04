@@ -614,6 +614,11 @@ private:
 	float retractHop;							// Z hop when retracting
 	bool isRetracted;							// true if filament has been firmware-retracted
 
+	uint8_t tuningMode;
+	float tuningGcodeVal;
+	float tuningStartVal;
+	float tuningEndVal;
+
 	// Triggers
 	Trigger triggers[MaxTriggers];				// Trigger conditions
 	TriggerInputsBitmap lastEndstopStates;		// States of the trigger inputs last time we looked
