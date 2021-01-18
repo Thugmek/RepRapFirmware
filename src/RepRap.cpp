@@ -575,7 +575,7 @@ void RepRap::Diagnostics(MessageType mtype)
 #endif
 
 	// Show the used and free buffer counts. Do this early in case we are running out of them and the diagnostics get truncated.
-	OutputBuffer::Diagnostics(mtype);
+	// OutputBuffer::Diagnostics(mtype);
 
 	// Now print diagnostics for other modules
 	Tasks::Diagnostics(mtype);
@@ -1464,14 +1464,22 @@ OutputBuffer *RepRap::GetStatusResponse(uint8_t type, ResponseSource source)
 		const int8_t chamberHeater = (NumChamberHeaters > 0) ? heat->GetChamberHeater(0) : -1;
 		if (chamberHeater != -1)
 		{
-			response->catf("\"chamber\":{\"current\":%.1f,\"active\":%.1f,\"state\":%d,\"heater\":%d},",
+			response->catf("\"chamber\":{\"current\":%.1f,\"active\":%.1f,\"state\":%d,\"heater\":%d,\"slave\":%d,\"sensors\":",
 				(double)heat->GetTemperature(chamberHeater), (double)heat->GetActiveTemperature(chamberHeater),
-					heat->GetStatus(chamberHeater), chamberHeater);
+					heat->GetStatus(chamberHeater), chamberHeater, heat->GetHeaterSlave(chamberHeater));
+
+			char ch = '[';
+			for (size_t sensor = 0; sensor < NumHeaterSensors; sensor++)
+			{
+				response->catf("%c%.1f", ch, (double)heat->GetSensorTemperature(chamberHeater, sensor));
+				ch = ',';
+			}
+			response->cat((ch == '[') ? "[]}," : "]},");
 		}
 
 		/* Cabinet */
 		const int8_t cabinetHeater = (NumChamberHeaters > 1) ? heat->GetChamberHeater(1) : -1;
-		if (cabinetHeater != -1)
+		if (cabinetHeater != -1 && !heat->IsHeaterSlave(cabinetHeater))
 		{
 			response->catf("\"cabinet\":{\"current\":%.1f,\"active\":%.1f,\"state\":%d,\"heater\":%d},",
 				(double)heat->GetTemperature(cabinetHeater), (double)heat->GetActiveTemperature(cabinetHeater),
@@ -2037,6 +2045,21 @@ OutputBuffer *RepRap::GetTrilabStatusResponse(uint8_t type, ResponseSource sourc
 				}
 				response->cat("]}");
 			}
+
+			/* Chamber */
+			const int8_t chamberHeater = (NumChamberHeaters > 0) ? heat->GetChamberHeater(0) : -1;
+			if (chamberHeater != -1)
+			{
+				response->catf(",\"chamber\":{\"current\":%.1f,\"active\":%.1f", (double)heat->GetTemperature(chamberHeater), (double)heat->GetActiveTemperature(chamberHeater));
+
+				int8_t chamberHeaterSlave = heat->GetHeaterSlave(chamberHeater);
+				if (chamberHeaterSlave != -1)
+				{
+					response->catf(",\"slave\":{\"current\":%.1f}", (double)heat->GetTemperature(chamberHeaterSlave));
+				}
+				response->cat("}");
+			}
+
 			response->cat("}");
 		}
 

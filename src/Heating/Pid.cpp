@@ -92,7 +92,7 @@ bool PID::SetModel(float gain, float tc, float td, float maxPwm, float voltage, 
 			platform.EnableSharedFan(!model.IsEnabled());
 		}
 #endif
-		if (model.IsEnabled())
+		if (model.IsEnabled() and false) // Disable warning MS 18.1.2021
 		{
 			const float predictedMaxTemp = gain + NormalAmbientTemperature;
 			const float noWarnTemp = (temperatureLimit - NormalAmbientTemperature) * 1.5 + 50.0;		// allow 50% extra power plus enough for an extra 50C
@@ -705,16 +705,17 @@ void PID::DoTuningStep()
 	case HeaterMode::tuning1:
 		// Heating up
 		{
-			const bool isBedOrChamberHeater = reprap.GetHeat().IsBedOrChamberHeater(heater);
+			const bool isBedHeater = reprap.GetHeat().IsBedHeater(heater);
+			const bool isChamberHeater = reprap.GetHeat().IsChamberHeater(heater);
 			const uint32_t heatingTime = millis() - tuningPhaseStartTime;
-			const float extraTimeAllowed = (isBedOrChamberHeater) ? 60.0 : 30.0;
+			const float extraTimeAllowed = (isChamberHeater) ? 300.0 : (isBedHeater) ? 60.0 : 30.0;
 			if (heatingTime > (uint32_t)((model.GetDeadTime() + extraTimeAllowed) * SecondsToMillis) && (temperature - tuningStartTemp) < 3.0)
 			{
 				platform.Message(GenericMessage, "Auto tune cancelled because temperature is not increasing\n");
 				break;
 			}
 
-			const uint32_t timeoutMinutes = (isBedOrChamberHeater) ? 30 : 7;
+			const uint32_t timeoutMinutes = (isChamberHeater) ? 60 : (isBedHeater) ? 30 : 7;
 			if (heatingTime >= timeoutMinutes * 60 * (uint32_t)SecondsToMillis)
 			{
 				platform.Message(GenericMessage, "Auto tune cancelled because target temperature was not reached\n");

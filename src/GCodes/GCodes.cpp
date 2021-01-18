@@ -4851,11 +4851,22 @@ GCodeResult GCodes::SetHeaterParameters(GCodeBuffer& gb, const StringRef& reply)
 
 		if ((heater >= 0 && heater < (int)NumHeaters) || (heater >= (int)FirstVirtualHeater && heater < (int)(FirstVirtualHeater + MaxVirtualHeaters)))
 		{
+			size_t number = 0;
+			if (gb.Seen('N')) {
+				number = gb.GetUIValue();
+
+				if (number >= NumHeaterSensors) {
+					reply.printf("heater sensor number %d is out of range", number);
+					return GCodeResult::error;
+				}
+			}
+
 			Heat& heat = reprap.GetHeat();
-			const int oldChannel = heat.GetHeaterChannel(heater);
+			const int oldChannel = heat.GetHeaterChannel(heater, number);
 			bool seen = false;
 			int32_t channel = oldChannel;
 			gb.TryGetIValue('X', channel, seen);
+
 			if (!seen && oldChannel < 0)
 			{
 				// For backwards compatibility, if no sensor has been configured on this channel then assume the thermistor normally associated with the heater
@@ -4872,14 +4883,14 @@ GCodeResult GCodes::SetHeaterParameters(GCodeBuffer& gb, const StringRef& reply)
 
 			if (channel != oldChannel)
 			{
-				if (heat.SetHeaterChannel(heater, channel))
+				if (heat.SetHeaterChannel(heater, channel, number))
 				{
 					reply.printf("unable to use sensor channel %" PRIi32 " on heater %d", channel, heater);
 					return GCodeResult::error;
 				}
 			}
 
-			return heat.ConfigureHeaterSensor(305, (unsigned int)heater, gb, reply);
+			return heat.ConfigureHeaterSensor(305, (unsigned int)heater, gb, reply, number);
 		}
 		else
 		{

@@ -2712,19 +2712,35 @@ void Platform::DriverCoolingFansOnOff(uint32_t driverChannelsMonitored, bool on)
 // Power is a fraction in [0,1]
 void Platform::SetHeater(size_t heater, float power, PwmFrequency freq)
 {
-	if (HEAT_ON_PINS[heater] != NoPin)
+	int8_t slaveHeater = reprap.GetHeat().GetHeaterSlave(heater);
+	if (slaveHeater >= 0)
 	{
-		if (freq == 0)
+		Heat& heat = reprap.GetHeat();
+
+		float limTemp = heat.GetHighestTemperatureLimit(slaveHeater) - 5.0;
+		float reqTemp = heat.GetTargetTemperature(heater);
+
+		float setTemp = 0.0;
+		setTemp = reqTemp + ((limTemp - reqTemp) * power);
+
+		heat.SetActiveTemperature(slaveHeater, setTemp);
+	}
+	else
+	{
+		if (HEAT_ON_PINS[heater] != NoPin)
 		{
-			freq = (reprap.GetHeat().IsBedOrChamberHeater(heater)) ? SlowHeaterPwmFreq : NormalHeaterPwmFreq;	// use default PWM frequency
-		}
-		const float pwm =
+			if (freq == 0)
+			{
+				freq = (reprap.GetHeat().IsBedOrChamberHeater(heater)) ? SlowHeaterPwmFreq : NormalHeaterPwmFreq;	// use default PWM frequency
+			}
+			const float pwm =
 #if ACTIVE_LOW_HEAT_ON
-			1.0 - power;
+				1.0 - power;
 #else
-			power;
+				power;
 #endif
-		IoPort::WriteAnalog(HEAT_ON_PINS[heater], pwm, freq);
+				IoPort::WriteAnalog(HEAT_ON_PINS[heater], pwm, freq);
+		}
 	}
 }
 

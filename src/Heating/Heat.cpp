@@ -52,6 +52,11 @@ Heat::Heat(Platform& p)
 	ARRAY_INIT(bedHeaters, DefaultBedHeaters);
 	ARRAY_INIT(chamberHeaters, DefaultChamberHeaters);
 
+	for (size_t i=0; i < NumHeaters; i++)
+	{
+		heaterSlaves[i] = -1;
+	}
+
 	for (size_t index : ARRAY_INDICES(heaterProtections))
 	{
 		heaterProtections[index] = new HeaterProtection(index);
@@ -60,7 +65,10 @@ Heat::Heat(Platform& p)
 	for (size_t heater : ARRAY_INDICES(pids))
 	{
 		pids[heater] = new PID(platform, heater);
+	}
 
+	for (size_t heater : ARRAY_INDICES(lastActiveTemperature))
+	{
 		lastActiveTemperature[heater] = 0.0;
 	}
 }
@@ -100,10 +108,18 @@ void Heat::Init()
 		}
 	}
 
+	for (size_t i=0; i < NumHeaters; i++)
+	{
+		heaterSlaves[i] = -1;
+	}
+
 	// Then set up the real heaters and the corresponding PIDs
 	for (size_t heater : ARRAY_INDICES(pids))
 	{
-		heaterSensors[heater] = nullptr;			// no temperature sensor assigned yet
+		for (size_t number : ARRAY_INDICES(heaterSensors[heater]))
+		{
+			heaterSensors[heater][number] = nullptr;			// no temperature sensor assigned yet
+		}
 #ifdef PCCB
 		// PCCB has no heaters by default, but we pretend that the LED outputs are heaters. So disable the PID controllers.
 		pids[heater]->Init(-1.0, -1.0, -1.0, true, false);
@@ -301,6 +317,24 @@ Heat::HeaterStatus Heat::GetStatus(int8_t heater) const
 						: HS_standby;
 }
 
+float Heat::GetSensorTemperature(int8_t heater, int8_t sensorNum) const
+{
+	TemperatureSensor * const * const spp = GetSensor(heater, sensorNum);
+
+	if (spp == nullptr)
+		return BadErrorTemperature;
+
+	if (*spp == nullptr)
+		return BadErrorTemperature;
+
+	float t;
+	if ((*spp)->GetTemperature(t) != TemperatureError::success)
+	{
+		return BadErrorTemperature;
+	}
+	return t;
+}
+
 void Heat::SetBedHeater(size_t index, int8_t heater)
 {
 	const int bedHeater = bedHeaters[index];
@@ -351,7 +385,7 @@ void Heat::SetActiveTemperature(int8_t heater, float t)
 	{
 		pids[heater]->SetActiveTemperature(t);
 
-		if (t > 0) // If is not 0, then save for restore
+		if (t > 0 and !IsHeaterSlave(heater)) // If is not 0, then save for restore
 		{
 			SetLastActiveTemperature(heater, t);
 
@@ -577,16 +611,16 @@ bool Heat::WriteModelParameters(FileStore *f) const
 }
 
 // Return the channel used by a particular heater, or -1 if not configured
-int Heat::GetHeaterChannel(size_t heater) const
+int Heat::GetHeaterChannel(size_t heater, size_t number) const
 {
-	const TemperatureSensor * const * const spp = GetSensor(heater);
+	const TemperatureSensor * const * const spp = GetSensor(heater, number);
 	return (spp != nullptr && *spp != nullptr) ? (*spp)->GetSensorChannel() : -1;
 }
 
 // Set the channel used by a heater, returning true if bad heater or channel number
-bool Heat::SetHeaterChannel(size_t heater, int channel)
+bool Heat::SetHeaterChannel(size_t heater, int channel, size_t number)
 {
-	TemperatureSensor ** const spp = GetSensor(heater);
+	TemperatureSensor ** const spp = GetSensor(heater, number);
 	if (spp == nullptr)
 	{
 		return true;		// bad heater number
@@ -604,9 +638,9 @@ bool Heat::SetHeaterChannel(size_t heater, int channel)
 }
 
 // Configure the temperature sensor for a channel
-GCodeResult Heat::ConfigureHeaterSensor(unsigned int mcode, size_t heater, GCodeBuffer& gb, const StringRef& reply)
+GCodeResult Heat::ConfigureHeaterSensor(unsigned int mcode, size_t heater, GCodeBuffer& gb, const StringRef& reply, size_t number)
 {
-	TemperatureSensor ** const spp = GetSensor(heater);
+	TemperatureSensor ** const spp = GetSensor(heater, number);
 	if (spp == nullptr || *spp == nullptr)
 	{
 		reply.printf("heater %d is not configured", heater);
@@ -617,11 +651,11 @@ GCodeResult Heat::ConfigureHeaterSensor(unsigned int mcode, size_t heater, GCode
 }
 
 // Get a pointer to the temperature sensor entry, or nullptr if the heater number is bad
-TemperatureSensor **Heat::GetSensor(size_t heater)
+TemperatureSensor **Heat::GetSensor(size_t heater, size_t number)
 {
 	if (heater < NumHeaters)
 	{
-		return &heaterSensors[heater];
+		return &heaterSensors[heater][number];
 	}
 	if (heater >= FirstVirtualHeater && heater < FirstVirtualHeater + ARRAY_SIZE(virtualHeaterSensors))
 	{
@@ -631,11 +665,11 @@ TemperatureSensor **Heat::GetSensor(size_t heater)
 }
 
 // Get a pointer to the temperature sensor entry, or nullptr if the heater number is bad (const version of above)
-TemperatureSensor * const *Heat::GetSensor(size_t heater) const
+TemperatureSensor * const *Heat::GetSensor(size_t heater, size_t number) const
 {
 	if (heater < NumHeaters)
 	{
-		return &heaterSensors[heater];
+		return &heaterSensors[heater][number];
 	}
 	if (heater >= FirstVirtualHeater && heater < FirstVirtualHeater + ARRAY_SIZE(virtualHeaterSensors))
 	{
@@ -707,25 +741,47 @@ bool Heat::CheckHeater(size_t heater)
 // Get the temperature of a real or virtual heater
 float Heat::GetTemperature(size_t heater, TemperatureError& err)
 {
-	TemperatureSensor * const * const spp = GetSensor(heater);
-	if (spp == nullptr)
+	float temperatures[NumHeaterSensors];
+	size_t numConfiguredSensors = 0;
+
+	for (size_t n = 0; n < NumHeaterSensors; n++)
 	{
-		err = TemperatureError::unknownHeater;
-		return BadErrorTemperature;
+		TemperatureSensor * const * const spp = GetSensor(heater, n);
+		if (spp == nullptr)
+		{
+			err = TemperatureError::unknownHeater;
+			return BadErrorTemperature;
+		}
+
+		if (*spp == nullptr)
+		{
+			if (n == 0)
+			{
+				err = TemperatureError::unknownChannel;
+				return BadErrorTemperature;
+			}
+			else
+			{
+				break;
+			}
+		}
+
+		err = (*spp)->GetTemperature(temperatures[n]);
+		if (err != TemperatureError::success)
+		{
+			return BadErrorTemperature;
+		}
+
+		numConfiguredSensors += 1;
 	}
 
-	if (*spp == nullptr)
+	float t = 0.0;
+	for (size_t n = 0; n < numConfiguredSensors; n++)
 	{
-		err = TemperatureError::unknownChannel;
-		return BadErrorTemperature;
+		t += temperatures[n];
 	}
+	t = t / (float)numConfiguredSensors;
 
-	float t;
-	err = (*spp)->GetTemperature(t);
-	if (err != TemperatureError::success)
-	{
-		t = BadErrorTemperature;
-	}
 	return t;
 }
 
@@ -840,6 +896,24 @@ void Heat::SetLastActiveTemperature(int8_t heater, float t)
 float Heat::GetLastActiveTemperature(int8_t heater)
 {
 	return lastActiveTemperature[heater];
+}
+
+void Heat::SetHeaterSlave(size_t heater, int8_t slaveHeater)
+{
+	heaterSlaves[heater] = slaveHeater;
+
+
+	platform.MessageF(BlockingUsbMessage, "teeest %d %d\n", heater, slaveHeater);
+}
+
+bool Heat::IsHeaterSlave(int8_t heater)
+{
+	for (int masterHeater = 0; masterHeater < (int)NumHeaters; ++masterHeater)
+	{
+		if (heaterSlaves[masterHeater] == heater)
+			return true;
+	}
+	return false;
 }
 
 // End

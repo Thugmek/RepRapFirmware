@@ -45,6 +45,7 @@ constexpr size_t MaxSmartDrivers = 10;				// The maximum number of smart drivers
 
 constexpr size_t NumEndstops = 12;					// The number of inputs we have for endstops, filament sensors etc.
 constexpr size_t NumHeaters = 8;					// The number of heaters in the machine
+constexpr size_t NumHeaterSensors = 3;				// The number sensors per heater
 constexpr size_t NumExtraHeaterProtections = 8;		// The number of extra heater protection instances
 constexpr size_t NumThermistorInputs = 8;
 

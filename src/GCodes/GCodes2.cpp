@@ -1910,6 +1910,24 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				{
 					heat.SetBedHeater(index, heater);
 				}
+
+				if (gb.Seen('D'))
+				{
+					int slaveHeater = gb.GetIValue();
+					if (slaveHeater < 0)
+					{
+						slaveHeater = -1;
+					}
+					else if (slaveHeater >= (int)NumHeaters)
+					{
+						reply.printf("Invalid slave heater number '%d'", slaveHeater);
+						result = GCodeResult::error;
+						break;
+					}
+
+					heat.SetHeaterSlave(heater, slaveHeater);
+				}
+
 				platform.UpdateConfiguredHeaters();
 			}
 

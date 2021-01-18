@@ -80,6 +80,7 @@ public:
 	float GetTemperature(int8_t heater) const;					// Get the temperature of a heater
 	float GetTargetTemperature(int8_t heater) const;			// Get the target temperature
 	HeaterStatus GetStatus(int8_t heater) const;				// Get the off/standby/active status
+	float GetSensorTemperature(int8_t heater, int8_t sensorNum) const;
 	void SwitchOff(int8_t heater);								// Turn off a specific heater
 	void SwitchOffAll(bool includingChamberAndBed);				// Turn all heaters off
 	void ResetFault(int8_t heater);								// Reset a heater fault - only call this if you know what you are doing
@@ -132,9 +133,10 @@ public:
 
 	bool WriteModelParameters(FileStore *f) const;				// Write heater model parameters to file returning true if no error
 
-	int GetHeaterChannel(size_t heater) const;					// Return the channel used by a particular heater, or -1 if not configured
-	bool SetHeaterChannel(size_t heater, int channel);			// Set the channel used by a heater, returning true if bad heater or channel number
-	GCodeResult ConfigureHeaterSensor(size_t heater, unsigned int mcode, GCodeBuffer& gb, const StringRef& reply);	// Configure the temperature sensor for a channel
+	int GetHeaterChannel(size_t heater, size_t number = 0) const;			  // Return the channel used by a particular heater, or -1 if not configured
+	bool SetHeaterChannel(size_t heater, int channel, size_t number = 0); // Set the channel used by a heater, returning true if bad heater or channel number
+
+	GCodeResult ConfigureHeaterSensor(size_t heater, unsigned int mcode, GCodeBuffer& gb, const StringRef& reply, size_t number = 0);	// Configure the temperature sensor for a channel
 	const char *GetHeaterName(size_t heater) const;				// Get the name of a heater, or nullptr if it hasn't been named
 
 	HeaterProtection& AccessHeaterProtection(size_t index) const;	// Return the protection parameters of the given index
@@ -162,11 +164,15 @@ public:
 
 	void SetLastActiveTemperature(int8_t heater, float t);
 	float GetLastActiveTemperature(int8_t heater);
+
+	void SetHeaterSlave(size_t heater, int8_t slaveHeater);
+	int8_t GetHeaterSlave(size_t heater);
+	bool IsHeaterSlave(int8_t heater);
 private:
 	Heat(const Heat&);											// Private copy constructor to prevent copying
 
-	TemperatureSensor **GetSensor(size_t heater);				// Get a pointer to the temperature sensor entry
-	TemperatureSensor * const *GetSensor(size_t heater) const;	// Get a pointer to the temperature sensor entry
+	TemperatureSensor **GetSensor(size_t heater, size_t number = 0);					// Get a pointer to the temperature sensor entry
+	TemperatureSensor * const *GetSensor(size_t heater, size_t number = 0) const;	// Get a pointer to the temperature sensor entry
 
 	Platform& platform;											// The instance of the RepRap hardware class
 
@@ -175,7 +181,7 @@ private:
 	PID* pids[NumHeaters];										// A PID controller for each heater
 	const Tool* lastStandbyTools[NumHeaters];					// The last tool that caused the corresponding heater to be set to standby
 
-	TemperatureSensor *heaterSensors[NumHeaters];				// The sensor used by the real heaters
+	TemperatureSensor *heaterSensors[NumHeaters][NumHeaterSensors];	// The sensor used by the real heaters
 	TemperatureSensor *virtualHeaterSensors[MaxVirtualHeaters];	// Sensors for virtual heaters
 
 #ifdef RTOS
@@ -190,6 +196,7 @@ private:
 	bool coldExtrude;											// Is cold extrusion allowed?
 	int8_t bedHeaters[NumBedHeaters];							// Indices of the hot bed heaters to use or -1 if none is available
 	int8_t chamberHeaters[NumChamberHeaters];					// Indices of the chamber heaters to use or -1 if none is available
+	int8_t heaterSlaves[NumHeaters];
 	int8_t heaterBeingTuned;									// which PID is currently being tuned
 	int8_t lastHeaterTuned;										// which PID we last finished tuning
 
@@ -277,6 +284,11 @@ inline void Heat::GetFaultDetectionParameters(size_t heater, float& maxTempExcur
 inline void Heat::SetFaultDetectionParameters(size_t heater, float maxTempExcursion, float maxFaultTime)
 {
 	pids[heater]->SetFaultDetectionParameters(maxTempExcursion, maxFaultTime);
+}
+
+inline int8_t Heat::GetHeaterSlave(size_t heater)
+{
+	return heaterSlaves[heater];
 }
 
 #endif
