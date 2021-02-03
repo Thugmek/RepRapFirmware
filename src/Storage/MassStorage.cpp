@@ -635,7 +635,7 @@ GCodeResult MassStorage::Unmount(size_t card, const StringRef& reply)
 		return GCodeResult::error;
 	}
 
-	reply.printf("SD card %u may now be removed", card);
+	// reply.printf("SD card %u may now be removed", card); // MS 2021-02-01 potlaceni hlasek pri updatu configu
 	const unsigned int numFilesClosed = InternalUnmount(card, true);
 	if (numFilesClosed != 0)
 	{

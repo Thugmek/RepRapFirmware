@@ -2131,7 +2131,7 @@ OutputBuffer *RepRap::GetTrilabStatusResponse(uint8_t type, ResponseSource sourc
 			const int8_t chamberHeater = (NumChamberHeaters > 0) ? heat->GetChamberHeater(0) : -1;
 			if (chamberHeater != -1)
 			{
-				response->catf("\"c\":{\"c\":%.1f,\"a\":%.1f,\"s\":%d}",
+				response->catf(",\"c\":{\"c\":%.1f,\"a\":%.1f,\"s\":%d}",
 					(double)heat->GetTemperature(chamberHeater), (double)heat->GetActiveTemperature(chamberHeater), heat->GetStatus(chamberHeater));
 			}
 

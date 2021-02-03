@@ -1001,19 +1001,33 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		break;
 
 	case 600: // Filament change pause, synchronous
-		if (!isPaused && !IsPausing())
+		if (!IsPausing())
 		{
-			if (gb.IsDoingFileMacro())
-			{
-				filamentChangePausePending = true;
-			}
-			else
+			if (isPaused)
 			{
 				if (!LockMovementAndWaitForStandstill(gb))	// lock movement before calling DoPause, also wait for movement to complete
 				{
 					return false;
 				}
-				DoPause(gb, PauseReason::filamentChange, nullptr);
+				if (AllAxesAreHomed())
+				{
+					DoFileMacro(gb, FILAMENT_CHANGE_PAUSED_G, false);
+				}
+			}
+			else
+			{
+				if (gb.IsDoingFileMacro())
+				{
+					filamentChangePausePending = true;
+				}
+				else
+				{
+					if (!LockMovementAndWaitForStandstill(gb))	// lock movement before calling DoPause, also wait for movement to complete
+					{
+						return false;
+					}
+					DoPause(gb, PauseReason::filamentChange, nullptr);
+				}
 			}
 		}
 		break;
@@ -1231,6 +1245,8 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 					break;
 
 				case MassStorage::InfoResult::ok:
+					break; // MS 2021-02-01 potlaceni hlasek pri updatu configu
+
 					reply.printf("SD card in slot %" PRIu32 ": capacity %.2fGb, free space %.2fGb, speed %.2fMBytes/sec, cluster size ",
 									slot, (double)capacity/(1000*1000*1000), (double)freeSpace/(1000*1000*1000), (double)speed/(1000*1000));
 					if (clSize < 1024)
