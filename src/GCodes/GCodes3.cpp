@@ -64,6 +64,9 @@ GCodeResult GCodes::SetPrintZProbe(GCodeBuffer& gb, const StringRef& reply)
 	gb.TryGetFValue(axisLetters[X_AXIS], params.xOffset, seen);
 	gb.TryGetFValue(axisLetters[Y_AXIS], params.yOffset, seen);
 
+	if (params.xOffset == 20.0) // MS 2021-02-09 Temporary fix
+		params.xOffset = 10.0;
+
 	if (gb.Seen(axisLetters[Z_AXIS]))
 	{
 		seen = true;

@@ -354,6 +354,8 @@ bool GCodes::HandleGcode(GCodeBuffer& gb, const StringRef& reply)
 			return false;
 		}
 		{
+			bedProbingMode = (gb.Seen('P')) ? gb.GetIValue() : 1;
+
 			const int sparam = (gb.Seen('S')) ? gb.GetIValue() : 0;
 			switch(sparam)
 			{
@@ -1529,7 +1531,12 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		{
 			// Get the temperature to set
 			float temperature;
-			if (gb.Seen('R'))
+			if (gb.Seen('C'))
+			{
+				gb.MachineState().waitWhileCooling = true;
+				temperature = 0.0;
+			}
+			else if (gb.Seen('R'))
 			{
 				gb.MachineState().waitWhileCooling = true;
 				temperature = gb.GetFValue();
@@ -1615,7 +1622,14 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 
 				if (code == 109 && simulationMode == 0)
 				{
-					gb.SetState(GCodeState::m109WaitForTemperature);
+					if (gb.Seen('C'))
+					{
+						gb.SetState(GCodeState::m109WaitForCooling);
+					}
+					else
+					{
+						gb.SetState(GCodeState::m109WaitForTemperature);
+					}
 				}
 			}
 		}

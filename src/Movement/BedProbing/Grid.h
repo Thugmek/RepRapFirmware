@@ -68,12 +68,13 @@ public:
 
 	float GetInterpolatedHeightError(float x, float y) const;		// Compute the interpolated height error at the specified point
 	void ClearGridHeights();										// Clear all grid height corrections
-	void SetGridHeight(size_t xIndex, size_t yIndex, float height);	// Set the height of a grid point
+	void SetGridHeight(size_t xIndex, size_t yIndex, float height, size_t mode=1);	// Set the height of a grid point
 
 	bool SaveToFile(FileStore *f, float zOffset) const				// Save the grid to file returning true if an error occurred
 	pre(IsValid());
 
 	bool LoadFromFile(FileStore *f, const StringRef& r);			// Load the grid from file returning true if an error occurred
+	bool LoadCorrectionFile(FileStore *f);
 
 	unsigned int GetMinimumSegments(float deltaX, float deltaY) const;	// Return the minimum number of segments for a move by this X or Y amount
 
@@ -84,7 +85,11 @@ public:
 																	// Return number of points probed, mean and RMS deviation, min and max error
 	void ExtrapolateMissing();										// Extrapolate missing points to ensure consistency
 
+	void Normalize();
+
 private:
+	static constexpr const char* CorrectionHeightMapFile = "correction-heightmap.csv";
+
 	static const char * const HeightMapComment;						// The start of the comment we write at the start of the height map file
 
 	GridDefinition def;

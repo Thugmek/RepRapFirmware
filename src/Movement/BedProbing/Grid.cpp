@@ -240,11 +240,26 @@ void HeightMap::SetGrid(const GridDefinition& gd)
 {
 	useMap = false;
 	def = gd;
+
 	ClearGridHeights();
 }
 
 void HeightMap::ClearGridHeights()
 {
+	FileStore * const f = reprap.GetPlatform().OpenSysFile(CorrectionHeightMapFile, OpenMode::read);
+	if (f != nullptr)
+	{
+		LoadCorrectionFile(f);
+		f->Close();
+	}
+	else
+	{
+		for (size_t i = 0; i < MaxGridProbePoints; ++i)
+		{
+			gridHeights[i] = 0;
+		}
+	}
+
 	for (size_t i = 0; i < ARRAY_SIZE(gridHeightSet); ++i)
 	{
 		gridHeightSet[i] = 0;
@@ -252,12 +267,18 @@ void HeightMap::ClearGridHeights()
 }
 
 // Set the height of a grid point
-void HeightMap::SetGridHeight(size_t xIndex, size_t yIndex, float height)
+void HeightMap::SetGridHeight(size_t xIndex, size_t yIndex, float height, size_t mode)
 {
 	size_t index = yIndex * def.numX + xIndex;
 	if (index < MaxGridProbePoints)
 	{
-		gridHeights[index] = height;
+		if (mode == 1)
+			gridHeights[index] += height;
+		else if (mode == 2)
+			gridHeights[index] -= height;
+		else
+			gridHeights[index] = height;
+
 		gridHeightSet[index/32] |= 1u << (index & 31u);
 	}
 }
@@ -292,6 +313,7 @@ bool HeightMap::SaveToFile(FileStore *f, float zOffset) const
 	}
 	float mean, deviation, minError, maxError;
 	(void)GetStatistics(mean, deviation, minError, maxError);
+
 	buf.catf(", min error %.3f, max error %.3f, mean %.3f, deviation %.3f\n",
 				(double)(minError + zOffset), (double)(maxError + zOffset), (double)(mean + zOffset), (double)deviation);
 	if (!f->Write(buf.c_str()))
@@ -423,6 +445,85 @@ bool HeightMap::LoadFromFile(FileStore *f, const StringRef& r)
 	return true;											// an error occurred
 }
 
+bool HeightMap::LoadCorrectionFile(FileStore *f)
+{
+	const size_t MaxLineLength = (MaxXGridPoints * 8) + 2;						// maximum length of a line in the height map file, need 8 characters per grid point
+	char buffer[MaxLineLength + 1];
+	StringRef s(buffer, ARRAY_SIZE(buffer));
+
+	GridDefinition newGrid;
+	int gridVersion;
+
+	if (f->ReadLine(buffer, sizeof(buffer)) <= 0)
+	{
+		return true;
+	}
+	else if (!StringStartsWith(buffer, HeightMapComment))	// check the version line is as expected
+	{
+		return true;
+	}
+	else if (f->ReadLine(buffer, sizeof(buffer)) <= 0)
+	{
+		return true;
+	}
+	else if ((gridVersion = GridDefinition::CheckHeading(s)) < 0)				// check the label line is as expected
+	{
+		return true;
+	}
+	else if (f->ReadLine(buffer, sizeof(buffer)) <= 0)		// read the height map parameters
+	{
+		return true;
+	}
+	else if (!newGrid.ReadParameters(s, gridVersion))
+	{
+		return true;
+	}
+	else if (!newGrid.IsValid())
+	{
+		return true;
+	}
+	else
+	{
+		for (uint32_t row = 0; row < def.numY; ++row)		// read the grid a row at a time
+		{
+			if (f->ReadLine(buffer, sizeof(buffer)) <= 0)
+			{
+				return true;								// failed to read a line
+			}
+			const char *p = buffer;
+			for (uint32_t col = 0; col < def.numX; ++col)
+			{
+				while (*p == ' ' || *p == '\t')
+				{
+					++p;
+				}
+				if (*p == '0' && (p[1] == ',' || p[1] == 0))
+				{
+					// Values of 0 with no decimal places in un-probed values, so leave the point set as not valid
+					++p;
+				}
+				else
+				{
+					const char* np;
+					const float f = SafeStrtof(p, &np);
+					if (np == p)
+					{
+						return true;						// failed to read a number
+					}
+					SetGridHeight(col, row, f, 0);
+					p = np;
+				}
+				if (*p == ',')
+				{
+					++p;
+				}
+			}
+		}
+		return false;										// success!
+	}
+	return true;											// an error occurred
+}
+
 // Return number of points probed, mean and RMS deviation, min and max error
 unsigned int HeightMap::GetStatistics(float& mean, float& deviation, float& minError, float& maxError) const
 {
@@ -458,6 +559,7 @@ unsigned int HeightMap::GetStatistics(float& mean, float& deviation, float& minE
 		mean = (float)(heightSum/numProbed);
 		deviation = (float)sqrt(((heightSquaredSum * numProbed) - (heightSum * heightSum)))/numProbed;
 	}
+
 	return numProbed;
 }
 
@@ -601,6 +703,26 @@ void HeightMap::ExtrapolateMissing()
 			}
 		}
 	}
+}
+
+void HeightMap::Normalize()
+{
+	float mean, deviation, minError, maxError;
+	(void)GetStatistics(mean, deviation, minError, maxError);
+
+	for (uint32_t iY = 0; iY < def.numY; iY++)
+	{
+		for (uint32_t iX = 0; iX < def.numX; iX++)
+		{
+			const uint32_t index = GetMapIndex(iX, iY);
+			if (IsHeightSet(index))
+			{
+				gridHeights[index] -= mean;
+			}
+		}
+	}
+
+	ExtrapolateMissing();
 }
 
 // End

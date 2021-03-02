@@ -834,6 +834,23 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 		}
 		break;
 
+	case GCodeState::m109WaitForCooling:
+		if (cancelWait || simulationMode != 0 || ToolHeatersCold(reprap.GetCurrentTool()))
+		{
+			SetMappedFanSpeed(0.0);
+
+			cancelWait = isWaiting = false;
+			gb.SetState(GCodeState::normal);
+		}
+		else
+		{
+			SetMappedFanSpeed(1.0);
+
+			CheckReportDue(gb, reply);
+			isWaiting = true;
+		}
+		break;
+
 	case GCodeState::waitingForPalette2_1:
 		if (LockMovementAndWaitForStandstill(gb))
 		{
@@ -1173,7 +1190,7 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 
 			if (acceptReading)
 			{
-				reprap.GetMove().AccessHeightMap().SetGridHeight(gridXindex, gridYindex, g30zHeightError);
+				reprap.GetMove().AccessHeightMap().SetGridHeight(gridXindex, gridYindex, g30zHeightError, bedProbingMode);
 				gb.AdvanceState();
 			}
 			else if (tapsDone < params.maxTaps)
@@ -1247,6 +1264,9 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 			const uint32_t numPointsProbed = reprap.GetMove().AccessHeightMap().GetStatistics(mean, deviation, minError, maxError);
 			if (numPointsProbed >= 4)
 			{
+				reprap.GetMove().AccessHeightMap().Normalize();
+				reprap.GetMove().AccessHeightMap().GetStatistics(mean, deviation, minError, maxError);
+
 				reply.printf("%" PRIu32 " points probed, min error %.3f, max error %.3f, mean %.3f, deviation %.3f\n",
 								numPointsProbed, (double)minError, (double)maxError, (double)mean, (double)deviation);
 				error = TrySaveHeightMap(DefaultHeightMapFile, reply);
@@ -5223,6 +5243,21 @@ bool GCodes::ToolHeatersAtSetTemperatures(const Tool *tool, bool waitWhenCooling
 		for (size_t i = 0; i < tool->HeaterCount(); ++i)
 		{
 			if (!reprap.GetHeat().HeaterAtSetTemperature(tool->Heater(i), waitWhenCooling, tolerance))
+			{
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+bool GCodes::ToolHeatersCold(const Tool *tool) const
+{
+	if (tool != nullptr)
+	{
+		for (size_t i = 0; i < tool->HeaterCount(); ++i)
+		{
+			if (reprap.GetHeat().GetTemperature(tool->Heater(i)) > TEMPERATURE_COLD)
 			{
 				return false;
 			}

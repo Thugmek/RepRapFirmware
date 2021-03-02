@@ -40,6 +40,7 @@ enum class GCodeState : uint8_t
 	m109ToolChange2,
 	m109ToolChangeComplete,
 	m109WaitForTemperature,
+	m109WaitForCooling,
 
 	pausing1,
 	pausing2,
@@ -97,7 +98,7 @@ enum class GCodeState : uint8_t
 
 	readingHeadDefinition1,
 	readingHeadDefinition2,
-	readingHeadDefinition3,
+	readingHeadDefinition3
 };
 
 // Class to hold the state of gcode execution for some input source
