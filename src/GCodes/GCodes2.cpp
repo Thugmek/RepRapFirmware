@@ -361,7 +361,7 @@ bool GCodes::HandleGcode(GCodeBuffer& gb, const StringRef& reply)
 			{
 			case 0:		// probe and save height map
 				if (platform.SysFileExists(BED_LEVELING_G) && gb.MachineState().codeRunning != 29)
-					DoFileMacro(gb, BED_LEVELING_G, true, 29);	// Try to execute bed-leveling.g
+					DoFileMacro(gb, BED_LEVELING_G, true, 29);	// Try to execute leveling.g
 				else
 					result = ProbeGrid(gb, reply);
 
@@ -425,7 +425,7 @@ bool GCodes::HandleGcode(GCodeBuffer& gb, const StringRef& reply)
 			// which means that no gcode source other than the one that executed G32 is allowed to jog the Z axis.
 			UnlockAll(gb);
 
-			DoFileMacro(gb, BED_EQUATION_G, true);	// Try to execute bed.g
+			DoFileMacro(gb, bedEquationFilename, true);	// Try to execute bed.g
 		}
 		break;
 
@@ -4957,6 +4957,30 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		}
 		break;
 
+	case 1032:	// Set G32 filename
+		{
+			if (gb.Seen('S'))
+			{
+				String<G32ConfigFileNameLength> filename;
+				if (!gb.GetQuotedString(filename.GetRef()))
+				{
+					reply.copy("Invalid G32 filename");
+					result = GCodeResult::error;
+				}
+				else
+				{
+					SetG32Filename(filename.c_str());
+				}
+			}
+		}
+		break;
+
+	case 1109: 	// Disable/enable wait for hotend cooling
+		{
+			m109WaitForCooling = (gb.Seen('C')) ? gb.GetIValue() : 1;
+		}
+		break;
+
 	case 1408:
 		{
 			const int type = gb.Seen('S') ? gb.GetIValue() : 0;
@@ -4973,6 +4997,14 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			{
 				result = GCodeResult::notFinished;			// we ran out of buffers, so try again later
 			}
+		}
+		break;
+
+	case 1700: // Timelapse
+		{
+			String<FormatStringLength> params;
+
+			SendTrilabControlerRequest(gb, 1700, params.c_str(), true);
 		}
 		break;
 

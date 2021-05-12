@@ -127,6 +127,8 @@ GCodes::GCodes(Platform& p) :
 	queuedGCode = new GCodeBuffer("queue", GenericMessage, false);
 	autoPauseGCode = new GCodeBuffer("autopause", GenericMessage, false);
 	codeQueue = new GCodeQueue();
+
+	bedEquationFilename = nullptr;
 }
 
 void GCodes::Exit()
@@ -163,6 +165,8 @@ void GCodes::Init()
 	limitAxes = noMovesBeforeHoming = true;
 	SetAllAxesNotHomed();
 
+	m109WaitForCooling = true;
+
 	for (float& f : pausedFanSpeeds)
 	{
 		f = 0.0;
@@ -177,6 +181,8 @@ void GCodes::Init()
 	lastAuxStatusReportType = -1;						// no status reports requested yet
 
 	tuningMode = 0;
+
+	RestoreDefaultG32Filename();
 
 	laserMaxPower = DefaultMaxLaserPower;
 	laserPowerSticky = false;
@@ -196,6 +202,25 @@ void GCodes::Init()
 #ifdef SERIAL_AUX_DEVICE
 	SERIAL_AUX_DEVICE.SetInterruptCallback(GCodes::CommandEmergencyStop);
 #endif
+}
+
+void GCodes::SetG32Filename(const char *filename)
+{
+	const size_t tmpLength = strlen(filename);
+	char *tmpName = new char[tmpLength + 1];
+	SafeStrncpy(tmpName, filename, tmpLength + 1);
+	bedEquationFilename = tmpName;
+}
+
+void GCodes::RestoreDefaultG32Filename()
+{
+	// Restore default probing method
+	if (bedEquationFilename != nullptr)
+	{
+		delete [] bedEquationFilename;
+	}
+
+	SetG32Filename(BED_EQUATION_G);
 }
 
 // This is called from Init and when doing an emergency stop
@@ -397,6 +422,8 @@ bool GCodes::RunHeadConfigFile(GCodeBuffer& gb, Tool* tool, Head* head)
 
 bool GCodes::RunPrintpadConfigFile(GCodeBuffer& gb, Pad* pad)
 {
+	RestoreDefaultG32Filename();
+
 	return DoFileMacro(gb, pad->GetConfigFileName(), true, 1831);
 }
 
@@ -835,7 +862,7 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 		break;
 
 	case GCodeState::m109WaitForCooling:
-		if (cancelWait || simulationMode != 0 || ToolHeatersCold(reprap.GetCurrentTool()))
+		if (cancelWait || simulationMode != 0 || ToolHeatersCold(reprap.GetCurrentTool()) || not m109WaitForCooling)
 		{
 			SetMappedFanSpeed(0.0);
 
@@ -2932,6 +2959,55 @@ const char* GCodes::DoStraightMove(GCodeBuffer& gb, bool isCoordinated)
 			{
 				currentUserPosition[axis] = moveArg + GetWorkplaceOffset(axis);
 			}
+		}
+	}
+
+	if (gb.Seen('D'))
+	{
+		size_t axis = Z_AXIS;
+
+		// If it is a special move on a delta, movement must be relative.
+		if (moveBuffer.moveType != 0 && !gb.MachineState().axesRelative && reprap.GetMove().GetKinematics().GetKinematicsType() == KinematicsType::linearDelta)
+		{
+			return "G0/G1: attempt to move individual motors of a delta machine to absolute positions";
+		}
+
+		SetBit(axesMentioned, axis);
+		const float moveArg = platform.GetZProbeDiveHeight();
+		if (moveBuffer.moveType != 0)
+		{
+			// Special moves update the move buffer directly, bypassing the user coordinates
+			if (gb.MachineState().axesRelative)
+			{
+				moveBuffer.coords[axis] += moveArg * (1.0 - moveFractionToSkip);
+			}
+			else
+			{
+				moveBuffer.coords[axis] = moveArg;
+			}
+		}
+		else if (rp != nullptr)
+		{
+			currentUserPosition[axis] = moveArg + rp->moveCoords[axis];
+			// When a restore point is being used (G1 R parameter) then we used to set any coordinates that were not mentioned to the restore point values.
+			// But that causes issues for tool change on IDEX machines because we end up restoring the U axis when we shouldn't.
+			// So we no longer do that, and the user must mention any axes that he wants restored e.g. G1 R2 X0 Y0.
+		}
+		else if (gb.MachineState().axesRelative)
+		{
+			currentUserPosition[axis] += moveArg * (1.0 - moveFractionToSkip);
+		}
+		else if (gb.MachineState().g53Active)
+		{
+			currentUserPosition[axis] = moveArg + GetCurrentToolOffset(axis);	// g53 ignores tool offsets as well as workplace coordinates
+		}
+		else if (gb.MachineState().runningSystemMacro)
+		{
+			currentUserPosition[axis] = moveArg;								// don't apply workplace offsets to commands in system macros
+		}
+		else
+		{
+			currentUserPosition[axis] = moveArg + GetWorkplaceOffset(axis);
 		}
 	}
 

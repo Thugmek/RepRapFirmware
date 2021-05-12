@@ -1481,9 +1481,17 @@ OutputBuffer *RepRap::GetStatusResponse(uint8_t type, ResponseSource source)
 		const int8_t cabinetHeater = (NumChamberHeaters > 1) ? heat->GetChamberHeater(1) : -1;
 		if (cabinetHeater != -1 && !heat->IsHeaterSlave(cabinetHeater))
 		{
-			response->catf("\"cabinet\":{\"current\":%.1f,\"active\":%.1f,\"state\":%d,\"heater\":%d},",
+			response->catf("\"cabinet\":{\"current\":%.1f,\"active\":%.1f,\"state\":%d,\"heater\":%d,\"sensors\":",
 				(double)heat->GetTemperature(cabinetHeater), (double)heat->GetActiveTemperature(cabinetHeater),
 					heat->GetStatus(cabinetHeater), cabinetHeater);
+
+			char ch = '[';
+			for (size_t sensor = 0; sensor < NumHeaterSensors; sensor++)
+			{
+				response->catf("%c%.1f", ch, (double)heat->GetSensorTemperature(cabinetHeater, sensor));
+				ch = ',';
+			}
+			response->cat((ch == '[') ? "[]}," : "]},");
 		}
 
 		/* Heaters */

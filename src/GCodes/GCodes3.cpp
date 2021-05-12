@@ -606,7 +606,19 @@ GCodeResult GCodes::SetOrReportZProbe(GCodeBuffer& gb, const StringRef &reply)
 
 	if (gb.Seen('H')) // dive height
 	{
-		params.diveHeight = gb.GetFValue();
+		const float reqDiveHeight = gb.GetFValue();
+
+		if (gb.Seen('L')) // Only if current Dive height is lower then requested
+		{
+			if (params.diveHeight < reqDiveHeight)
+			{
+				params.diveHeight = reqDiveHeight;
+			}
+
+		} else
+		{
+			params.diveHeight = reqDiveHeight;
+		}
 		seen = true;
 
 		// Dive height restored to low distance, while initialize accessories macro running -> initialize accessories done

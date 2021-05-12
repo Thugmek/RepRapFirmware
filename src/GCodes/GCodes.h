@@ -36,6 +36,8 @@ Licence: GPL
 const char feedrateLetter = 'F';						// GCode feedrate
 const char extrudeLetter = 'E'; 						// GCode extrude
 
+constexpr size_t G32ConfigFileNameLength = 32;				// maximum allowed length for head config filename
+
 // Type for specifying which endstops we want to check
 typedef uint32_t EndstopsBitmap;						// must be large enough to hold a bitmap of drive numbers or ZProbeActive
 const EndstopsBitmap ZProbeActive = 1 << 31;			// must be distinct from 1 << (any drive number)
@@ -454,6 +456,9 @@ private:
 	static void CommandEmergencyStop(UARTClass *p);
 #endif
 
+	void SetG32Filename(const char *filename);
+	void RestoreDefaultG32Filename();
+
 	Platform& platform;													// The RepRap machine
 
 	FileGCodeInput* fileInput;											// ...
@@ -622,6 +627,8 @@ private:
 	float tuningStartVal;
 	float tuningEndVal;
 
+
+
 	// Triggers
 	Trigger triggers[MaxTriggers];				// Trigger conditions
 	TriggerInputsBitmap lastEndstopStates;		// States of the trigger inputs last time we looked
@@ -671,6 +678,9 @@ private:
 	bool displayNoToolWarning;					// True if we need to display a 'no tool selected' warning
 	bool m501SeenInConfigFile;					// true if M501 was executed form config.g
 	char filamentToLoad[FilamentNameLength];	// Name of the filament being loaded
+	bool m109WaitForCooling;
+
+	const char *bedEquationFilename;
 
 	// Standard macro filenames
 	static constexpr const char* BED_EQUATION_G = "bed.g";
@@ -696,7 +706,7 @@ private:
 	static constexpr const char* RESUME_PROLOGUE_G = "resurrect-prologue.g";
 	static constexpr const char* FILAMENT_CHANGE_G = "filament-change.g";
 	static constexpr const char* FILAMENT_CHANGE_PAUSED_G = "filament-change-paused.g";
-	static constexpr const char* BED_LEVELING_G = "bed-leveling.g";
+	static constexpr const char* BED_LEVELING_G = "leveling.g";
 #if HAS_SMART_DRIVERS
 	static constexpr const char* REHOME_G = "rehome.g";
 #endif
