@@ -50,21 +50,32 @@ typedef uint32_t TriggerInputsBitmap;					// Bitmap of input pins that a single 
 typedef uint32_t TriggerNumbersBitmap;					// Bitmap of trigger numbers
 static_assert(MaxTriggers <= sizeof(TriggerNumbersBitmap) * CHAR_BIT, "need larger TriggerNumbersBitmap type");
 
+enum class TriggerType
+{
+	unknown,
+	door,
+	none
+};
+
 struct Trigger
 {
+	TriggerType type;
 	TriggerInputsBitmap rising;
 	TriggerInputsBitmap falling;
+	TriggerInputsBitmap stateLow;
+	TriggerInputsBitmap stateHigh;
 	uint8_t condition;
 
 	void Init()
 	{
-		rising = falling = 0;
+		type = TriggerType::unknown;
+		rising = falling = stateLow = stateHigh = 0;
 		condition = 0;
 	}
 
 	bool IsUnused() const
 	{
-		return rising == 0 && falling == 0;
+		return rising == 0 && falling == 0 && stateLow == 0 && stateHigh == 0;
 	}
 };
 
@@ -105,6 +116,7 @@ enum class StopPrintReason
 	userCancelled,
 	abort
 };
+
 
 //****************************************************************************************************
 
@@ -383,7 +395,7 @@ private:
 	GCodeResult UnloadFilament(GCodeBuffer& gb, const StringRef& reply);		// Unload the current filament from a tool
 	bool ChangeMicrostepping(size_t drive, unsigned int microsteps, bool interp) const; // Change microstepping on the specified drive
 	void ListTriggers(const StringRef& reply, TriggerInputsBitmap mask);		// Append a list of trigger inputs to a message
-	void CheckTriggers();														// Check for and execute triggers
+	TriggerType CheckTriggers(const bool forcePrinting = false);														// Check for and execute triggers
 	void CheckFilament();														// Check for and respond to filament errors
 	void CheckHeaterFault();													// Check for and respond to a heater fault, returning true if we should exit
 	void DoEmergencyStop();														// Execute an emergency stop
@@ -455,10 +467,6 @@ private:
 	static bool emergencyStopCommanded;
 	static void CommandEmergencyStop(UARTClass *p);
 #endif
-
-	void SetG32Filename(const char *filename);
-	void RestoreDefaultG32Filename();
-
 	Platform& platform;													// The RepRap machine
 
 	FileGCodeInput* fileInput;											// ...
@@ -626,8 +634,7 @@ private:
 	float tuningGcodeVal;
 	float tuningStartVal;
 	float tuningEndVal;
-
-
+	float tuningCurVal;
 
 	// Triggers
 	Trigger triggers[MaxTriggers];				// Trigger conditions
@@ -680,10 +687,9 @@ private:
 	char filamentToLoad[FilamentNameLength];	// Name of the filament being loaded
 	bool m109WaitForCooling;
 
-	const char *bedEquationFilename;
-
 	// Standard macro filenames
 	static constexpr const char* BED_EQUATION_G = "bed.g";
+	static constexpr const char* BED_EQUATION_CUSTOM_G = "bed-%d.g";
 	static constexpr const char* PAUSE_G = "pause.g";
 	static constexpr const char* RESUME_G = "resume.g";
 	static constexpr const char* CANCEL_G = "cancel.g";
@@ -712,6 +718,7 @@ private:
 #endif
 	static constexpr const char* INITIALIZE_ACCESSORIES_G = "InitializeAccessory.g";
 	static constexpr const char* PURGE_LINE_G = "purge-line.g";
+	static constexpr const char* PURGE_LINE_CUSTOM_G = "purge-line-%d.g";
 
 	static constexpr const float MinServoPulseWidth = 544.0, MaxServoPulseWidth = 2400.0;
 };

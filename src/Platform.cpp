@@ -643,10 +643,35 @@ void Platform::Init()
 	// Kick everything off
 	InitialiseInterrupts();
 
+	// Fan voltage regulators
+	for (size_t i = 0; i < NumFanVoltageRegulators; ++i)
+	{
+		pinMode(FAN_VOLTAGE_REGULATOR_SEL_24V_PINS[i], OUTPUT_LOW);
+		pinMode(FAN_VOLTAGE_REGULATOR_SEL_12V_PINS[i], OUTPUT_LOW);
+	}
+
 #ifdef DUET_NG
 	DuetExpansion::DueXnTaskInit();								// must initialise interrupt priorities before calling this
 #endif
 	active = true;
+}
+
+void Platform::SetFanVoltage(size_t fan, int voltage)
+{
+	if (fan < NumFanVoltageRegulators) {
+		if (voltage == 12) {
+			pinMode(FAN_VOLTAGE_REGULATOR_SEL_24V_PINS[fan], OUTPUT_LOW);
+			pinMode(FAN_VOLTAGE_REGULATOR_SEL_12V_PINS[fan], OUTPUT_HIGH);
+
+		} else if (voltage == 24) {
+			pinMode(FAN_VOLTAGE_REGULATOR_SEL_24V_PINS[fan], OUTPUT_HIGH);
+			pinMode(FAN_VOLTAGE_REGULATOR_SEL_12V_PINS[fan], OUTPUT_LOW);
+
+		} else { // 5
+			pinMode(FAN_VOLTAGE_REGULATOR_SEL_24V_PINS[fan], OUTPUT_LOW);
+			pinMode(FAN_VOLTAGE_REGULATOR_SEL_12V_PINS[fan], OUTPUT_LOW);
+		}
+	}
 }
 
 void Platform::SetZProbeDefaults()
@@ -2717,7 +2742,7 @@ void Platform::SetHeater(size_t heater, float power, PwmFrequency freq)
 	{
 		Heat& heat = reprap.GetHeat();
 
-		float limTemp = heat.GetHighestTemperatureLimit(slaveHeater) - 5.0;
+		float limTemp = heat.GetHighestTemperatureLimit(slaveHeater) - 15.0;
 		float reqTemp = heat.GetTargetTemperature(heater);
 
 		float setTemp = 0.0;
@@ -3778,11 +3803,6 @@ void Platform::RawMessage(MessageType type, const char *message)
 		logger->LogMessage(realTime, message);
 	}
 
-	if ((type & BluetoothMessage) != 0)
-	{
-		AppendAuxReply(message, false);
-	}
-
 	// Send the message to the destinations
 	if ((type & ImmediateLcdMessage) != 0)
 	{
@@ -3790,6 +3810,7 @@ void Platform::RawMessage(MessageType type, const char *message)
 	}
 	else if ((type & LcdMessage) != 0)
 	{
+		AppendAuxReply(message, false);
 		// AppendAuxReply(message, message[0] == '{' || (type & RawMessageFlag) != 0);
 	}
 

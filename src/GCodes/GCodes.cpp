@@ -127,8 +127,6 @@ GCodes::GCodes(Platform& p) :
 	queuedGCode = new GCodeBuffer("queue", GenericMessage, false);
 	autoPauseGCode = new GCodeBuffer("autopause", GenericMessage, false);
 	codeQueue = new GCodeQueue();
-
-	bedEquationFilename = nullptr;
 }
 
 void GCodes::Exit()
@@ -181,8 +179,10 @@ void GCodes::Init()
 	lastAuxStatusReportType = -1;						// no status reports requested yet
 
 	tuningMode = 0;
-
-	RestoreDefaultG32Filename();
+	tuningGcodeVal = 0.0;
+	tuningStartVal = 0.0;
+	tuningEndVal = 0.0;
+	tuningCurVal = 0.0;
 
 	laserMaxPower = DefaultMaxLaserPower;
 	laserPowerSticky = false;
@@ -202,25 +202,6 @@ void GCodes::Init()
 #ifdef SERIAL_AUX_DEVICE
 	SERIAL_AUX_DEVICE.SetInterruptCallback(GCodes::CommandEmergencyStop);
 #endif
-}
-
-void GCodes::SetG32Filename(const char *filename)
-{
-	const size_t tmpLength = strlen(filename);
-	char *tmpName = new char[tmpLength + 1];
-	SafeStrncpy(tmpName, filename, tmpLength + 1);
-	bedEquationFilename = tmpName;
-}
-
-void GCodes::RestoreDefaultG32Filename()
-{
-	// Restore default probing method
-	if (bedEquationFilename != nullptr)
-	{
-		delete [] bedEquationFilename;
-	}
-
-	SetG32Filename(BED_EQUATION_G);
 }
 
 // This is called from Init and when doing an emergency stop
@@ -422,7 +403,7 @@ bool GCodes::RunHeadConfigFile(GCodeBuffer& gb, Tool* tool, Head* head)
 
 bool GCodes::RunPrintpadConfigFile(GCodeBuffer& gb, Pad* pad)
 {
-	RestoreDefaultG32Filename();
+	pad->RestoreDefaultParameters();
 
 	return DoFileMacro(gb, pad->GetConfigFileName(), true, 1831);
 }
@@ -1913,21 +1894,31 @@ void GCodes::EndSimulation(GCodeBuffer *gb)
 }
 
 // Check for and execute triggers
-void GCodes::CheckTriggers()
+TriggerType GCodes::CheckTriggers(const bool forcePrinting)
 {
+	TriggerType triggerType = TriggerType::none;
+
 	// Check for endstop state changes that activate new triggers
 	const TriggerInputsBitmap oldEndstopStates = lastEndstopStates;
 	lastEndstopStates = platform.GetAllEndstopStates();
 	const TriggerInputsBitmap risen = lastEndstopStates & ~oldEndstopStates,
-					  	  	  fallen = ~lastEndstopStates & oldEndstopStates;
+					  	  	  fallen = ~lastEndstopStates & oldEndstopStates,
+							  state = lastEndstopStates;
 	unsigned int lowestTriggerPending = MaxTriggers;
 	for (unsigned int triggerNumber = 0; triggerNumber < MaxTriggers; ++triggerNumber)
 	{
 		const Trigger& ct = triggers[triggerNumber];
-		if (   ((ct.rising & risen) != 0 || (ct.falling & fallen) != 0)
-			&& (ct.condition == 0 || (ct.condition == 1 && reprap.GetPrintMonitor().IsPrinting()))
+		if (((ct.rising & risen) != 0 || (ct.falling & fallen) != 0)
+			&& (ct.condition == 0 || (ct.condition == 1 && (reprap.GetPrintMonitor().IsPrinting() || forcePrinting)))
 		   )
 		{
+			SetBit(triggersPending, triggerNumber);
+		}
+		if (((ct.stateLow & ~state) != 0 || (ct.stateHigh & state) != 0)
+			&& (ct.condition == 0 || (ct.condition == 1 && (reprap.GetPrintMonitor().IsPrinting() || forcePrinting)))
+		   )
+		{
+			triggerType = TriggerType::door;
 			SetBit(triggersPending, triggerNumber);
 		}
 		if (triggerNumber < lowestTriggerPending && IsBitSet(triggersPending, triggerNumber))
@@ -1947,6 +1938,8 @@ void GCodes::CheckTriggers()
 			 && daemonGCode->GetState() == GCodeState::normal		// and we are not already executing a trigger or config.g
 			)
 	{
+		triggerType = triggers[lowestTriggerPending].type;
+
 		if (lowestTriggerPending == 1)
 		{
 			if (!IsReallyPrinting())
@@ -1956,7 +1949,15 @@ void GCodes::CheckTriggers()
 			else if (LockMovement(*daemonGCode))					// need to lock movement before executing the pause macro
 			{
 				ClearBit(triggersPending, lowestTriggerPending);	// clear the trigger
-				DoPause(*daemonGCode, PauseReason::trigger, "Print paused by external trigger");
+
+				if (triggers[lowestTriggerPending].type == TriggerType::door)
+				{
+					DoPause(*daemonGCode, PauseReason::trigger, "Print paused due to opened door");
+				}
+				else
+				{
+					DoPause(*daemonGCode, PauseReason::trigger, "Print paused by external trigger");
+				}
 			}
 		}
 		else
@@ -1967,6 +1968,8 @@ void GCodes::CheckTriggers()
 			DoFileMacro(*daemonGCode, filename.c_str(), true);
 		}
 	}
+
+	return triggerType;
 }
 
 // Check for and respond to filament errors
@@ -1985,7 +1988,7 @@ void GCodes::CheckFilament()
 		lastFilamentError = FilamentSensorStatus::ok;
 		platform.Message(LogMessage, filamentErrorString.c_str());
 
-		platform.MessageF(BluetoothMessage, "no_filament: %s\n", filamentErrorString.c_str());
+		platform.MessageF(LcdMessage, "no_filament: %s\n", filamentErrorString.c_str());
 	}
 }
 
@@ -2689,12 +2692,17 @@ bool GCodes::LoadExtrusionAndFeedrateFromGCode(GCodeBuffer& gb, bool isPrintingM
 				float moveArg = gb.ConvertDistance(eMovement[0]);
 				if (reprap.GetPrintMonitor().IsPrinting() and tuningMode == 2 and abs(moveArg) == tuningGcodeVal) {
 					float sign = moveArg >= 0 ? 1.0 : -1.0;
-					moveArg = sign * (tuningStartVal + ((tuningEndVal - tuningStartVal) / 100.0 * reprap.GetPrintMonitor().FractionOfFilePrinted(true)));
+					tuningCurVal = (tuningStartVal + ((tuningEndVal - tuningStartVal) / 100.0 * reprap.GetPrintMonitor().FractionOfFilePrinted(true)));
+
+					moveArg = sign * tuningCurVal;
 				}
 				else if (reprap.GetPrintMonitor().IsPrinting() and tuningMode == 3 and abs(moveArg) == tuningGcodeVal) {
-					moveBuffer.feedRate = tuningStartVal + ((tuningEndVal - tuningStartVal) / 100.0 * reprap.GetPrintMonitor().FractionOfFilePrinted(true));
+					tuningCurVal = tuningStartVal + ((tuningEndVal - tuningStartVal) / 100.0 * reprap.GetPrintMonitor().FractionOfFilePrinted(true));
+
+					moveBuffer.feedRate = tuningCurVal;
 					moveBuffer.usingStandardFeedrate = true;
-					platform.MessageF(BlockingUsbMessage, "%.2f\n", (double)moveBuffer.feedRate);
+
+					// platform.MessageF(BlockingUsbMessage, "%.2f\n", (double)moveBuffer.feedRate);
 				}
 				float requestedExtrusionAmount;
 				if (gb.MachineState().drivesRelative)
@@ -2919,11 +2927,19 @@ const char* GCodes::DoStraightMove(GCodeBuffer& gb, bool isCoordinated)
 			const float moveArg = gb.GetDistance();
 			if (reprap.GetPrintMonitor().IsPrinting() and tuningMode == 1 and axis == Z_AXIS and moveArg > 0.0)
 			{
-				float temperature = round(tuningStartVal + ((tuningEndVal - tuningStartVal) / 100.0 * reprap.GetPrintMonitor().FractionOfFilePrinted(true)));
-				SetToolHeaters(reprap.GetCurrentOrDefaultTool(), temperature, true);
+				tuningCurVal = round(tuningStartVal + ((tuningEndVal - tuningStartVal) / 100.0 * reprap.GetPrintMonitor().FractionOfFilePrinted(true)));
+				SetToolHeaters(reprap.GetCurrentOrDefaultTool(), tuningCurVal, true);
 
-				platform.MessageF(BlockingUsbMessage, "%d\n", (int)temperature);
+				// platform.MessageF(BlockingUsbMessage, "%d\n", (int)temperature);
 			}
+			if (reprap.GetPrintMonitor().IsPrinting() and tuningMode == 4 and axis == Z_AXIS and moveArg > 0.0)
+			{
+				tuningCurVal = round(tuningStartVal + ((tuningEndVal - tuningStartVal) / 100.0 * reprap.GetPrintMonitor().FractionOfFilePrinted(true)));
+				SetMappedFanSpeed(tuningCurVal / 100.0);
+
+				// platform.MessageF(BlockingUsbMessage, "%d\n", (int)temperature);
+			}
+
 			if (moveBuffer.moveType != 0)
 			{
 				// Special moves update the move buffer directly, bypassing the user coordinates

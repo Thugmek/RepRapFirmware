@@ -39,7 +39,7 @@ constexpr size_t NumFirmwareUpdateModules = 4;		// 3 modules, plus one for manua
 
 // The physical capabilities of the machine
 
-constexpr size_t NumDirectDrivers = 12;				// The maximum number of drives supported directly by the electronics
+constexpr size_t NumDirectDrivers = 10;				// The maximum number of drives supported directly by the electronics
 constexpr size_t MaxTotalDrivers = NumDirectDrivers; // The maximum number of drives including CAN expansion
 constexpr size_t MaxSmartDrivers = 10;				// The maximum number of smart drivers
 
@@ -75,9 +75,14 @@ constexpr Pin AdditionalIoExpansionStart = 220;		// Pin numbers 220-235 are on t
 
 // DRIVES
 constexpr Pin GlobalTmc2660EnablePin = 38;			// The pin that drives ENN of all TMC2660 drivers on production boards (on pre-production boards they are grounded)
-constexpr Pin ENABLE_PINS[NumDirectDrivers] = { 78, 41, 42, 49, 57, 87, 88, 89, 90, 31, 82, 60 };
-constexpr Pin STEP_PINS[NumDirectDrivers] = { 70, 71, 72, 69, 68, 66, 65, 64, 67, 91, 84, 85 };
-constexpr Pin DIRECTION_PINS[NumDirectDrivers] = { 75, 76, 77, 01, 73, 92, 86, 80, 81, 32, 83, 25 };
+constexpr Pin ENABLE_PINS[NumDirectDrivers] = { 78, 41, 42, 49, 57, 87, 88, 89, 90, 31}; // 82, 60
+constexpr Pin STEP_PINS[NumDirectDrivers] = { 70, 71, 72, 69, 68, 66, 65, 64, 67, 91 }; // 84, 85
+constexpr Pin DIRECTION_PINS[NumDirectDrivers] = { 75, 76, 77, 01, 73, 92, 86, 80, 81, 32 }; // 83, 25
+
+// FAN voltage regulator
+constexpr size_t NumFanVoltageRegulators = 2;
+constexpr Pin FAN_VOLTAGE_REGULATOR_SEL_12V_PINS[NumFanVoltageRegulators] = { 60, 8 };
+constexpr Pin FAN_VOLTAGE_REGULATOR_SEL_24V_PINS[NumFanVoltageRegulators] = { 39, 82 };
 
 // Pin assignments etc. using USART1 in SPI mode
 Usart * const USART_TMC2660 = USART1;
@@ -95,7 +100,7 @@ constexpr Pin DueX_INT = 17;						// DueX interrupt pin = PA17 (was E6_STOP)
 // Endstops
 // RepRapFirmware only has a single endstop per axis.
 // Gcode defines if it is a max ("high end") or min ("low end") endstop and sets if it is active HIGH or LOW.
-constexpr Pin END_STOP_PINS[NumEndstops] = { 46, 02, 93, 74, 48, 96, 97, 98, 99, 17, 39, 8 };
+constexpr Pin END_STOP_PINS[NumEndstops] = { 46, 02, 93, 74, 48, 96, 97, 98, 99, 17 }; // 39, 8
 constexpr Pin DUEX_END_STOP_PINS[5] = { 200, 203, 202, 201, 213 };				// these replace endstops 5-9 if a DueX is present
 
 // HEATERS

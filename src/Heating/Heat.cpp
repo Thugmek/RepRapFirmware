@@ -298,7 +298,7 @@ bool Heat::HeaterAtSetTemperature(int8_t heater, bool waitWhenCooling, float tol
 
 	const float dt = GetTemperature(heater);
 	const float target = (pids[heater]->Active()) ? GetActiveTemperature(heater) : GetStandbyTemperature(heater);
-	return (target < TEMPERATURE_LOW_SO_DONT_CARE)
+	return (target < TEMPERATURE_LOW_SO_DONT_CARE && dt < TEMPERATURE_LOW_SO_DONT_CARE)
 		|| (fabsf(dt - target) <= tolerance)
 		|| (target < dt && !waitWhenCooling);
 }

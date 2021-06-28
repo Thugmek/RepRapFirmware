@@ -69,6 +69,8 @@ Pad * Pad::freelist = nullptr;
 		p->configFileName = padConfigFileName;
 	}
 
+	p->diameter = 0;
+
 	p->next = nullptr;
 
 	return p;
@@ -112,6 +114,11 @@ bool Pad::WriteSettings(FileStore *f) const
 void Pad::Print(const StringRef& reply) const
 {
 	reply.printf("Pad %u - name: %s, config: %s", number, GetName(), GetConfigFileName());
+}
+
+void Pad::RestoreDefaultParameters()
+{
+	diameter = 0;
 }
 
 // End

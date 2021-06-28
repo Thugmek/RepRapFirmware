@@ -696,6 +696,12 @@ GCodeResult GCodes::CheckOrConfigureTrigger(GCodeBuffer& gb, const StringRef& re
 			else
 			{
 				bool seen = false;
+				if (gb.Seen('B'))
+				{
+					seen = true;
+					triggers[triggerNumber].type = static_cast<TriggerType>(gb.GetIValue());
+				}
+
 				if (gb.Seen('C'))
 				{
 					seen = true;
@@ -736,6 +742,7 @@ GCodeResult GCodes::CheckOrConfigureTrigger(GCodeBuffer& gb, const StringRef& re
 						if (triggerMask == 0)
 						{
 							triggers[triggerNumber].rising = triggers[triggerNumber].falling = 0;
+							triggers[triggerNumber].stateLow = triggers[triggerNumber].stateHigh = 0;
 						}
 						else
 						{
@@ -752,6 +759,15 @@ GCodeResult GCodes::CheckOrConfigureTrigger(GCodeBuffer& gb, const StringRef& re
 						triggers[triggerNumber].rising |= triggerMask;
 						break;
 
+					case 10:
+						triggers[triggerNumber].stateLow |= triggerMask;
+						break;
+
+					case 11:
+						triggers[triggerNumber].stateHigh |= triggerMask;
+						break;
+
+
 					default:
 						platform.Message(ErrorMessage, "Bad S parameter in M581 command\n");
 					}
@@ -762,6 +778,10 @@ GCodeResult GCodes::CheckOrConfigureTrigger(GCodeBuffer& gb, const StringRef& re
 					ListTriggers(reply, triggers[triggerNumber].rising);
 					reply.cat(" or a falling edge on ");
 					ListTriggers(reply, triggers[triggerNumber].falling);
+					reply.cat(" or when state low on ");
+					ListTriggers(reply, triggers[triggerNumber].stateLow);
+					reply.cat(" or when state high on ");
+					ListTriggers(reply, triggers[triggerNumber].stateHigh);
 					reply.cat(" endstop inputs");
 					if (triggers[triggerNumber].condition == 1)
 					{

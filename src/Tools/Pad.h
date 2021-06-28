@@ -33,6 +33,11 @@ public:
 	const char *GetName() const;
 	const char *GetConfigFileName() const;
 
+	void RestoreDefaultParameters();
+
+	void SetDiameter(const int d);
+	int GetDiameter();
+
 	friend class RepRap;
 
 protected:
@@ -50,6 +55,7 @@ private:
 	int number;
 	const char *name;
 	const char *configFileName;
+	int diameter;
 };
 
 inline int Pad::GetNumber() const
@@ -65,6 +71,16 @@ inline const char *Pad::GetName() const
 inline const char *Pad::GetConfigFileName() const
 {
 	return (configFileName == nullptr) ? PAD_DEFAULT_CONFIG_FILE : configFileName;
+}
+
+inline void Pad::SetDiameter(const int d)
+{
+	diameter = d;
+}
+
+inline int Pad::GetDiameter()
+{
+	return diameter;
 }
 
 #endif /* PAD_H_ */

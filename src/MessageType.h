@@ -22,7 +22,6 @@ enum MessageType : uint32_t
 	TelnetMessage = 0x20,				// A message that is to be sent to a Telnet client
 	AuxMessage = 0x40,					// A message that is to be sent to the second auxiliary device
 	LogMessage = 0x80,					// A message to be written to the log file
-	BluetoothMessage = 0x100,			// A message that is to be sent to the Bluetooth
 
 	// Special indicators. The first two are not processed when calling the version of Platform::Message that takes an OutputBuffer.
 	ErrorMessageFlag = 0x200,			// This is an error message
@@ -32,14 +31,14 @@ enum MessageType : uint32_t
 	// Common combinations
 	NoDestinationMessage = 0,												// A message that is going nowhere
 	DebugMessage = BlockingUsbMessage,										// A debug message to send in blocking mode to USB
-	GenericMessage = UsbMessage | BluetoothMessage | HttpMessage | TelnetMessage,	// A message that is to be sent to the web, Telnet, USB and panel
+	GenericMessage = UsbMessage | LcdMessage | HttpMessage | TelnetMessage,	// A message that is to be sent to the web, Telnet, USB and panel
 	LoggedGenericMessage = GenericMessage | LogMessage,						// A GenericMessage that is also logged
 	DirectLcdMessage = LcdMessage | RawMessageFlag,							// Direct message to LCD
  	ErrorMessage = GenericMessage | LogMessage | ErrorMessageFlag,			// An error message
 	WarningMessage = GenericMessage | LogMessage | WarningMessageFlag,		// A warning message
 	FirmwareUpdateMessage = UsbMessage | ImmediateLcdMessage,				// A message that conveys progress of a firmware update
 	FirmwareUpdateErrorMessage = FirmwareUpdateMessage | ErrorMessageFlag,	// A message that reports an error during a firmware update
-	NetworkInfoMessage = UsbMessage | BluetoothMessage | LogMessage,			 	// A message that conveys information about the state of the network interface
+	NetworkInfoMessage = UsbMessage | LcdMessage | LogMessage,			 	// A message that conveys information about the state of the network interface
 };
 
 inline MessageType AddError(MessageType mt)

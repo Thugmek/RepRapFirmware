@@ -617,6 +617,9 @@ public:
 	void SetLaserPwmFrequency(float freq);
 	float GetLaserPwmFrequency() const { return laserPort.GetFrequency(); }
 
+
+	void SetFanVoltage(size_t fan, int voltage);
+
 	// Misc
 
 #if SAM4E || SAM4S || SAME70

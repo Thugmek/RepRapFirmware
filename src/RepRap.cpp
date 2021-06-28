@@ -937,6 +937,15 @@ void RepRap::SelectHead(GCodeBuffer& gb, Tool* tool, Head* head)
 	}
 
 	gCodes->RunHeadConfigFile(gb, tool, head);
+
+	// Clear tools heaters faults
+	for (const Tool *tool = GetFirstTool(); tool != nullptr; tool = tool->Next())
+	{
+		for (unsigned int heaterNumber = 0; heaterNumber < tool->HeaterCount(); ++heaterNumber)
+		{
+			ClearTemperatureFault(tool->Heater(heaterNumber));
+		}
+	}
 }
 
 void RepRap::PrintHead(int headNumber, const StringRef& reply) const

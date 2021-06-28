@@ -425,7 +425,16 @@ bool GCodes::HandleGcode(GCodeBuffer& gb, const StringRef& reply)
 			// which means that no gcode source other than the one that executed G32 is allowed to jog the Z axis.
 			UnlockAll(gb);
 
-			DoFileMacro(gb, bedEquationFilename, true);	// Try to execute bed.g
+			String<StringLength20> bedEquationFilename;
+			bedEquationFilename.copy(BED_EQUATION_G);
+
+			Pad* p = reprap.GetCurrentPad();
+			if (p != nullptr) {
+				if (p->GetDiameter() > 0)
+					bedEquationFilename.printf(BED_EQUATION_CUSTOM_G, p->GetDiameter());
+			}
+
+			DoFileMacro(gb, bedEquationFilename.c_str(), true);	// Try to execute
 		}
 		break;
 
@@ -480,7 +489,18 @@ bool GCodes::HandleGcode(GCodeBuffer& gb, const StringRef& reply)
 		break;
 
 	case 1009: // Purge line
-		result = DoFileMacro(gb, PURGE_LINE_G, true, 98) ? GCodeResult::ok : GCodeResult::error;
+		{
+			String<StringLength20> purgeLineFilename;
+			purgeLineFilename.copy(PURGE_LINE_G);
+
+			Pad* p = reprap.GetCurrentPad();
+			if (p != nullptr) {
+				if (p->GetDiameter() > 0)
+					purgeLineFilename.printf(PURGE_LINE_CUSTOM_G, p->GetDiameter());
+			}
+
+			result = DoFileMacro(gb, purgeLineFilename.c_str(), true, 98) ? GCodeResult::ok : GCodeResult::error;
+		}
 		break;
 
 	case 1031: // Return the probe value, or set probe variables
@@ -875,6 +895,13 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			break;
 		}
 
+		if (CheckTriggers(true) == TriggerType::door)
+		{
+			reply.copy("To start printing, please close the door");
+			result = GCodeResult::error;
+			break;
+		}
+
 		if (code == 32 && !LockMovementAndWaitForStandstill(gb))
 		{
 			return false;
@@ -941,15 +968,23 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				else
 #endif
 				{
-					if (reprap.GetPrintMonitor().IsPalette2Printing())
+					if (CheckTriggers() == TriggerType::door)
 					{
-						reprap.ClearAlert(); // Clear please follow the instructions on Palette screen alert
+						reply.copy("Cannot resume print while the door is open, please close the door");
+						result = GCodeResult::error;
 					}
-
-					gb.SetState(GCodeState::resuming1);
-					if (AllAxesAreHomed())
+					else
 					{
-						DoFileMacro(gb, RESUME_G, true);
+						if (reprap.GetPrintMonitor().IsPalette2Printing())
+						{
+							reprap.ClearAlert(); // Clear please follow the instructions on Palette screen alert
+						}
+
+						gb.SetState(GCodeState::resuming1);
+						if (AllAxesAreHomed())
+						{
+							DoFileMacro(gb, RESUME_G, true);
+						}
 					}
 				}
 			}
@@ -1544,6 +1579,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			else if (gb.Seen('S'))
 			{
 				gb.MachineState().waitWhileCooling = false;
+
 				temperature = gb.GetFValue();
 			}
 			else
@@ -1555,6 +1591,11 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 						temperature = 0.0;
 				else
 					break; // no target temperature given
+			}
+
+			if (code == 109) // MS
+			{
+				gb.MachineState().waitWhileCooling = true;
 			}
 
 			// Find the tool that the command applies to.
@@ -1840,7 +1881,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 					type = TelnetMessage;
 					break;
 				case 99:    // BT Message
-					type = BluetoothMessage;
+					type = LcdMessage;
 					break;
 				default:
 					reply.printf("Invalid message type: %lu", type);
@@ -1856,7 +1897,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 					String<GCODE_LENGTH> message;
 					gb.GetQuotedString(message.GetRef());
 
-					if (type == BluetoothMessage)
+					if (type == LcdMessage)
 						message.cat('\n');
 					platform.Message(type, message.c_str());
 					if (type != HttpMessage)
@@ -2108,6 +2149,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				else if (gb.Seen('S'))
 				{
 					waitWhenCooling = false;
+
 					temperature = gb.GetFValue();
 				}
 				else
@@ -2126,6 +2168,8 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 					if (temperature < activeTemperature)
 						temperature = activeTemperature;
 				}
+
+				waitWhenCooling = true; // MS
 
 				reprap.GetHeat().SetActiveTemperature(heater, temperature);
 				reprap.GetHeat().Activate(heater);
@@ -2669,7 +2713,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 
 			String<GCODE_LENGTH> message;
 			message.printf("ack_message: %d\n", cancelled ? 1 : 0);
-			platform.Message(BluetoothMessage, message.c_str());
+			platform.Message(LcdMessage, message.c_str());
 		}
 		break;
 
@@ -4957,24 +5001,6 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		}
 		break;
 
-	case 1032:	// Set G32 filename
-		{
-			if (gb.Seen('S'))
-			{
-				String<G32ConfigFileNameLength> filename;
-				if (!gb.GetQuotedString(filename.GetRef()))
-				{
-					reply.copy("Invalid G32 filename");
-					result = GCodeResult::error;
-				}
-				else
-				{
-					SetG32Filename(filename.c_str());
-				}
-			}
-		}
-		break;
-
 	case 1109: 	// Disable/enable wait for hotend cooling
 		{
 			m109WaitForCooling = (gb.Seen('C')) ? gb.GetIValue() : 1;
@@ -5016,16 +5042,95 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 		result = ManageHead(gb, reply);
 		break;
 
+	case 1811: // Set current printhead parameters
+		{
+			Head* h = reprap.GetCurrentHead();
+			if (h != nullptr) {
+				if (gb.Seen('H')) {
+					platform.SetFanVoltage(1, gb.GetUIValue());
+				}
+
+				if (gb.Seen('P')) {
+					platform.SetFanVoltage(0, gb.GetUIValue());
+				}
+			} else {
+				reply.printf("No head selected");
+				result = GCodeResult::error;
+			}
+		}
+		break;
+
 	case 1820: // Define pad
 		result = ManagePad(gb, reply);
 		break;
 
+	case 1821: // Set current printpad parameters
+		{
+			Pad* p = reprap.GetCurrentPad();
+			if (p != nullptr) {
+				if (gb.Seen('D')) {
+					p->SetDiameter(gb.GetUIValue());
+				}
+			} else {
+				reply.printf("No pad selected");
+				result = GCodeResult::error;
+			}
+		}
+		break;
+
 	case 1990:
 		{
-			tuningMode = (gb.Seen('P')) ? gb.GetUIValue() : 0;
-			tuningGcodeVal = (gb.Seen('R')) ? gb.GetFValue() : 0.0;
-			tuningStartVal = (gb.Seen('S')) ? gb.GetFValue() : 0.0;
-			tuningEndVal = (gb.Seen('E')) ? gb.GetFValue() : 0.0;
+			if (gb.Seen('P')) {
+				uint32_t tmpTuningMode = gb.GetUIValue();
+
+				if (tmpTuningMode > 4) {
+					reply.printf("Unknown mode");
+					result = GCodeResult::error;
+					break;
+				}
+
+				if (tmpTuningMode > 0) {
+					if (gb.Seen('S')) {
+						tuningStartVal = gb.GetFValue();
+					} else {
+						reply.printf("Parameter S(Start value) is missing");
+						result = GCodeResult::error;
+						break;
+					}
+
+					if (gb.Seen('E')) {
+						tuningEndVal = gb.GetFValue();
+					} else {
+						reply.printf("Parameter E(End value) is missing");
+						result = GCodeResult::error;
+						break;
+					}
+
+					if (tmpTuningMode == 2 or tmpTuningMode == 3) {
+						if (gb.Seen('R')) {
+							tuningGcodeVal = gb.GetFValue();
+						} else {
+							reply.printf("Parameter R(Gcode sliced value) is missing");
+							result = GCodeResult::error;
+							break;
+						}
+					}
+
+					tuningCurVal = 0.0;
+					tuningMode = tmpTuningMode;
+				}
+			} else {
+				if (tuningMode == 1)
+					reply.printf("Temperature tuning mode - Start value: %dC, End value: %dC, Current value: %dC", (int)tuningStartVal, (int)tuningEndVal, (int)tuningCurVal);
+				else if (tuningMode == 2)
+					reply.printf("Retraction length tuning mode - Slicer value: %.1fmm, Start value: %.1fmm, End value: %.1fmm, Current value: %.1fmm", (double)tuningGcodeVal, (double)tuningStartVal, (double)tuningEndVal, (double)tuningCurVal);
+				else if (tuningMode == 3)
+					reply.printf("Retraction speed tuning mode - Slicer value: %.1fmm/s, Start value: %.1fmm/s, End value: %.1fmm/s, Current value: %.1fmm/s", (double)tuningGcodeVal, (double)tuningStartVal, (double)tuningEndVal, (double)tuningCurVal);
+				else if (tuningMode == 4)
+					reply.printf("Print fan tuning mode - Start value: %d\%%, End value: %d\%%, Current value: %d\%%", (int)tuningStartVal, (int)tuningEndVal, (int)tuningCurVal);
+				else
+					reply.printf("Tuning disabled");
+			}
 		}
 		break;
 
