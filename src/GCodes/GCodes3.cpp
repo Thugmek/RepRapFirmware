@@ -16,6 +16,8 @@
 #include "PrintMonitor.h"
 #include "Tasks.h"
 #include "Hardware/I2C.h"
+#include "Tools/Head.h"
+#include "Tools/Pad.h"
 
 #if HAS_WIFI_NETWORKING
 # include "FirmwareUpdater.h"
@@ -606,7 +608,17 @@ GCodeResult GCodes::SetOrReportZProbe(GCodeBuffer& gb, const StringRef &reply)
 
 	if (gb.Seen('H')) // dive height
 	{
-		const float reqDiveHeight = gb.GetFValue();
+		float reqDiveHeight = gb.GetFValue();
+
+		if (reqDiveHeight == 0) {
+			Head* h = reprap.GetCurrentHead();
+			if (h != nullptr)
+				reqDiveHeight += h->GetDiveHeight();
+
+			Pad* p = reprap.GetCurrentPad();
+			if (p != nullptr)
+				reqDiveHeight += p->GetDiveHeight();
+		}
 
 		if (gb.Seen('L')) // Only if current Dive height is lower then requested
 		{

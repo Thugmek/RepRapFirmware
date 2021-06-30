@@ -5053,6 +5053,11 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				if (gb.Seen('P')) {
 					platform.SetFanVoltage(0, gb.GetUIValue());
 				}
+
+				if (gb.Seen('D')) {
+					h->SetDiveHeight(gb.GetFValue());
+				}
+
 			} else {
 				reply.printf("No head selected");
 				result = GCodeResult::error;
@@ -5070,6 +5075,10 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			if (p != nullptr) {
 				if (gb.Seen('D')) {
 					p->SetDiameter(gb.GetUIValue());
+				}
+
+				if (gb.Seen('H')) {
+					p->SetDiveHeight(gb.GetFValue());
 				}
 			} else {
 				reply.printf("No pad selected");

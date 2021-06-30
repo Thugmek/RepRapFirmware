@@ -69,6 +69,8 @@ Head * Head::freelist = nullptr;
 		h->configFileName = headConfigFileName;
 	}
 
+	h->RestoreDefaultParameters();
+
 	h->next = nullptr;
 
 	return h;
@@ -112,6 +114,11 @@ bool Head::WriteSettings(FileStore *f) const
 void Head::Print(const StringRef& reply) const
 {
 	reply.printf("Head %u - name: %s, config: %s", number, GetName(), GetConfigFileName());
+}
+
+void Head::RestoreDefaultParameters()
+{
+	diveHeight = 15.0;
 }
 
 // End

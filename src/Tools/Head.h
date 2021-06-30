@@ -35,6 +35,11 @@ public:
 
 	friend class RepRap;
 
+	void SetDiveHeight(const float d);
+	float GetDiveHeight();
+
+	void RestoreDefaultParameters();
+
 protected:
 	void Activate();
 
@@ -50,6 +55,7 @@ private:
 	int number;
 	const char *name;
 	const char *configFileName;
+	float diveHeight;
 };
 
 inline int Head::GetNumber() const
@@ -65,6 +71,16 @@ inline const char *Head::GetName() const
 inline const char *Head::GetConfigFileName() const
 {
 	return (configFileName == nullptr) ? HEAD_DEFAULT_CONFIG_FILE : configFileName;
+}
+
+inline void Head::SetDiveHeight(const float d)
+{
+	diveHeight = d;
+}
+
+inline float Head::GetDiveHeight()
+{
+	return diveHeight;
 }
 
 #endif /* HEAD_H_ */

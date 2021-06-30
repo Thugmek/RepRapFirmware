@@ -398,6 +398,8 @@ bool GCodes::RunHeadConfigFile(GCodeBuffer& gb, Tool* tool, Head* head)
 
 	*/
 
+	head->RestoreDefaultParameters();
+
 	return DoFileMacro(gb, head->GetConfigFileName(), true, 1830, tool->Number());
 }
 
@@ -1588,8 +1590,11 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 		}
 		else
 		{
-			// Just print the stop height
-			reply.printf("Stopped at height %.3f mm", (double)g30zStoppedHeight);
+			if (!gb.IsDoingFileMacro()) // MS do not print when running bed.g
+			{
+				// Just print the stop height
+				reply.printf("Stopped at height %.3f mm", (double)g30zStoppedHeight);
+			}
 		}
 		gb.SetState(GCodeState::normal);
 		break;
@@ -4913,7 +4918,11 @@ GCodeResult GCodes::SetHeaterProtection(GCodeBuffer& gb, const StringRef& reply)
 // Set PID parameters (M301 or M304 command). 'heater' is the default heater number to use.
 void GCodes::SetPidParameters(GCodeBuffer& gb, int heater, const StringRef& reply)
 {
-	if (gb.Seen('H'))
+	if (gb.MachineState().runningHeadDefinition)
+	{
+		heater = reprap.GetTool(gb.MachineState().macroIntParam0)->Heater(0);
+	}
+	else
 	{
 		heater = gb.GetIValue();
 	}

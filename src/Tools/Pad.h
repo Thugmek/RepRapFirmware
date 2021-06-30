@@ -37,6 +37,8 @@ public:
 
 	void SetDiameter(const int d);
 	int GetDiameter();
+	void SetDiveHeight(const float d);
+	float GetDiveHeight();
 
 	friend class RepRap;
 
@@ -56,6 +58,7 @@ private:
 	const char *name;
 	const char *configFileName;
 	int diameter;
+	float diveHeight;
 };
 
 inline int Pad::GetNumber() const
@@ -81,6 +84,16 @@ inline void Pad::SetDiameter(const int d)
 inline int Pad::GetDiameter()
 {
 	return diameter;
+}
+
+inline void Pad::SetDiveHeight(const float d)
+{
+	diveHeight = d;
+}
+
+inline float Pad::GetDiveHeight()
+{
+	return diveHeight;
 }
 
 #endif /* PAD_H_ */

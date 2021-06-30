@@ -69,7 +69,7 @@ Pad * Pad::freelist = nullptr;
 		p->configFileName = padConfigFileName;
 	}
 
-	p->diameter = 0;
+	p->RestoreDefaultParameters();
 
 	p->next = nullptr;
 
@@ -119,6 +119,7 @@ void Pad::Print(const StringRef& reply) const
 void Pad::RestoreDefaultParameters()
 {
 	diameter = 0;
+	diveHeight = 0;
 }
 
 // End
