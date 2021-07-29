@@ -746,10 +746,11 @@ void PID::DoTuningStep()
 	case HeaterMode::tuning2:
 		// Heater turned off, looking for peak temperature
 		{
+			const bool isChamberHeater = reprap.GetHeat().IsChamberHeater(heater);
 			const int peakIndex = GetPeakTempIndex();
 			if (peakIndex < 0)
 			{
-				if (millis() - tuningPhaseStartTime < 60 * 1000)			// allow 1 minute for the bed temperature reach peak temperature
+				if (millis() - tuningPhaseStartTime < (isChamberHeater ? 300 : 60) * 1000)			// allow 1 minute for the bed temperature reach peak temperature
 				{
 					return;			// still waiting for peak temperature
 				}
