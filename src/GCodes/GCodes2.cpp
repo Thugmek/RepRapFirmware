@@ -808,6 +808,8 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			{
 				if (strncmp(dir.c_str(), "2:", 2) == 0) // usb file list is sorted in RPi
 					outBuf = reprap.GetFilesResponse(dir.c_str(), rparam, true);	// send the file list in JSON format
+				else if (strncmp(dir.c_str(), "3:", 2) == 0) // gdrive file list
+					outBuf = reprap.GetFilesResponse(dir.c_str(), rparam, true);	// send the file list in JSON format
 				else
 					outBuf = reprap.GetSortedFilesResponse(dir.c_str(), rparam, true);	// send the sorted file list in JSON format
 
@@ -911,6 +913,10 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			if (gb.GetUnprecedentedString(filename.GetRef()))
 			{
 				if (strncmp(filename.c_str(), "2:", 2) == 0)
+				{
+					ForwardToUsb(gb);
+				}
+				else if (strncmp(filename.c_str(), "3:", 2) == 0) // Gdrive
 				{
 					ForwardToUsb(gb);
 				}
@@ -5217,9 +5223,12 @@ bool GCodes::HandleTcode(GCodeBuffer& gb, const StringRef& reply)
 				}
 				else
 				{
-					UnlockAll(gb);
-					HandleReply(gb, GCodeResult::error, "Invalid tool number");
-					return true;
+					if (&gb != auxGCode) // MS Temp because mobile app send both T0, T1
+					{
+						UnlockAll(gb);
+						HandleReply(gb, GCodeResult::error, "Invalid tool number");
+						return true;
+					}
 				}
 			}
 			else

@@ -70,7 +70,7 @@ MassStorage::MassStorage(Platform* p) : freeWriteBuffers(nullptr)
 
 void MassStorage::Init()
 {
-	static const char * const VolMutexNames[] = { "SD0", "SD1", "USB" };
+	static const char * const VolMutexNames[] = { "SD0", "SD1", "USB", "GDrive"};
 	static_assert(ARRAY_SIZE(VolMutexNames) >= NumSdCards, "Incorrect VolMutexNames array");
 
 	// Create the mutexes
@@ -190,7 +190,7 @@ void MassStorage::CloseAllFiles()
 bool MassStorage::FindFirst(const char *directory, FileInfo &file_info, bool withTimestamp)
 {
 #if SUPPORT_RPI_USB_DRIVE
-	if (strncmp(directory, "2:", 2) == 0)
+	if ((strncmp(directory, "2:", 2) == 0) or (strncmp(directory, "3:", 2) == 0))
 	{
 		findUsb = true;
 
@@ -476,7 +476,7 @@ bool MassStorage::DirectoryExists(const StringRef& path) const
 	}
 
 #if SUPPORT_RPI_USB_DRIVE
-	if (strncmp(path.c_str(), "2:", 2) == 0) {
+	if ((strncmp(path.c_str(), "2:", 2) == 0) or (strncmp(path.c_str(), "3:", 2) == 0)) {
 		return true;
 	}
 #endif
@@ -538,7 +538,7 @@ GCodeResult MassStorage::Mount(size_t card, const StringRef& reply, bool reportS
 	SdCardInfo& inf = info[card];
 
 #if SUPPORT_RPI_USB_DRIVE
-	if (card == 2) {
+	if (card == 2 || card == 3) {
 		inf.isMounted = true;
 
 		return GCodeResult::ok;
@@ -709,7 +709,7 @@ unsigned int MassStorage::InternalUnmount(size_t card, bool doClose)
 	SdCardInfo& inf = info[card];
 
 #if SUPPORT_RPI_USB_DRIVE
-	if (card == 2) {
+	if (card == 2 || card == 3) {
 		inf.isMounted = false;
 
 		return 0;
@@ -817,7 +817,7 @@ void MassStorage::Spin()
 bool MassStorage::GetFileInfo(const char *filePath, GCodeFileInfo& info, bool quitEarly)
 {
 #if SUPPORT_RPI_USB_DRIVE
-	if (strncmp(filePath, "2:", 2) == 0)
+	if ((strncmp(filePath, "2:", 2) == 0) or (strncmp(filePath, "3:", 2) == 0))
 	{
 		char rsp[MaxFilenameLength];
 

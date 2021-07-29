@@ -161,9 +161,9 @@ constexpr Pin TachoPins[NumTachos] = { 102 };								// PB6 on expansion connect
 
 // SD cards
 #if SUPPORT_RPI_USB_DRIVE
-constexpr size_t NumSdCards = 3;
-constexpr Pin SdCardDetectPins[NumSdCards] = {53, NoPin, NoPin};
-constexpr Pin SdWriteProtectPins[NumSdCards] = {NoPin, NoPin, NoPin};
+constexpr size_t NumSdCards = 4;
+constexpr Pin SdCardDetectPins[NumSdCards] = {53, NoPin, NoPin, NoPin};
+constexpr Pin SdWriteProtectPins[NumSdCards] = {NoPin, NoPin, NoPin, NoPin};
 #else
 constexpr size_t NumSdCards = 2;
 constexpr Pin SdCardDetectPins[NumSdCards] = {53, NoPin};
