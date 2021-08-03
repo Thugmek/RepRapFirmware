@@ -5343,7 +5343,7 @@ bool GCodes::ToolHeatersAtSetTemperatures(const Tool *tool, bool waitWhenCooling
 	{
 		for (size_t i = 0; i < tool->HeaterCount(); ++i)
 		{
-			if (!reprap.GetHeat().HeaterAtSetTemperature(tool->Heater(i), waitWhenCooling, tolerance))
+			if (!reprap.GetHeat().HeaterAtSetTemperature(tool->Heater(i), waitWhenCooling, tolerance, tolerance))
 			{
 				return false;
 			}
