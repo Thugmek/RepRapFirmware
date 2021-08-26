@@ -85,7 +85,7 @@ public:
 	void SwitchOffAll(bool includingChamberAndBed);				// Turn all heaters off
 	void ResetFault(int8_t heater);								// Reset a heater fault - only call this if you know what you are doing
 	bool AllHeatersAtSetTemperatures(bool includingBed, float tolerance) const;	// Is everything at temperature within tolerance?
-	bool HeaterAtSetTemperature(int8_t heater, bool waitWhenCooling, float tolerance) const;
+	bool HeaterAtSetTemperature(int8_t heater, bool waitWhenCooling, float toleranceHeating, float toleranceCooling) const;
 																// Is a specific heater at temperature within tolerance?
 	void Diagnostics(MessageType mtype);						// Output useful information
 
@@ -166,8 +166,8 @@ public:
 	float GetLastActiveTemperature(int8_t heater);
 
 	void SetHeaterSlave(size_t heater, int8_t slaveHeater);
-	int8_t GetHeaterSlave(size_t heater);
-	bool IsHeaterSlave(int8_t heater);
+	int8_t GetHeaterSlave(size_t heater) const;
+	bool IsHeaterSlave(int8_t heater) const;
 private:
 	Heat(const Heat&);											// Private copy constructor to prevent copying
 
@@ -286,7 +286,7 @@ inline void Heat::SetFaultDetectionParameters(size_t heater, float maxTempExcurs
 	pids[heater]->SetFaultDetectionParameters(maxTempExcursion, maxFaultTime);
 }
 
-inline int8_t Heat::GetHeaterSlave(size_t heater)
+inline int8_t Heat::GetHeaterSlave(size_t heater) const
 {
 	return heaterSlaves[heater];
 }

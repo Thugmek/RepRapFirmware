@@ -28,6 +28,7 @@ const char* TemperatureErrorString(TemperatureError err)
 	case TemperatureError::overOrUnderVoltage:	return "sensor short to other wiring";
 	case TemperatureError::badVref:			return "bad Vref";
 	case TemperatureError::badVssa:			return "bad Vssa";
+	case TemperatureError::sensorDifference:return "sensor difference out of tolerance";
 	default:								return "unknown temperature sense error";
 	}
 }

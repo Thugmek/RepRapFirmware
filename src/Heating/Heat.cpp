@@ -279,7 +279,7 @@ bool Heat::AllHeatersAtSetTemperatures(bool includingBed, float tolerance) const
 {
 	for (size_t heater : ARRAY_INDICES(pids))
 	{
-		if (!HeaterAtSetTemperature(heater, true, tolerance) && (includingBed || !IsBedHeater(heater)))
+		if (!HeaterAtSetTemperature(heater, true, tolerance, tolerance) && (includingBed || !IsBedHeater(heater)))
 		{
 			return false;
 		}
@@ -288,7 +288,7 @@ bool Heat::AllHeatersAtSetTemperatures(bool includingBed, float tolerance) const
 }
 
 //query an individual heater
-bool Heat::HeaterAtSetTemperature(int8_t heater, bool waitWhenCooling, float tolerance) const
+bool Heat::HeaterAtSetTemperature(int8_t heater, bool waitWhenCooling, float toleranceHeating, float toleranceCooling) const
 {
 	// If it hasn't anything to do, it must be right wherever it is...
 	if (heater < 0 || heater >= (int)NumHeaters || pids[heater]->SwitchedOff() || pids[heater]->FaultOccurred())
@@ -299,7 +299,7 @@ bool Heat::HeaterAtSetTemperature(int8_t heater, bool waitWhenCooling, float tol
 	const float dt = GetTemperature(heater);
 	const float target = (pids[heater]->Active()) ? GetActiveTemperature(heater) : GetStandbyTemperature(heater);
 	return (target < TEMPERATURE_LOW_SO_DONT_CARE && dt < TEMPERATURE_LOW_SO_DONT_CARE)
-		|| (fabsf(dt - target) <= tolerance)
+		|| (((target - dt) <= toleranceHeating) && ((dt - target) <= toleranceCooling))
 		|| (target < dt && !waitWhenCooling);
 }
 
@@ -308,6 +308,15 @@ Heat::HeaterStatus Heat::GetStatus(int8_t heater) const
 	if (heater < 0 || heater >= (int)NumHeaters)
 	{
 		return HS_off;
+	}
+
+	int8_t heaterSlave = GetHeaterSlave(heater);
+	if (heaterSlave >= 0)
+	{
+		if (pids[heaterSlave]->FaultOccurred())
+		{
+			return HS_fault;
+		}
 	}
 
 	return (pids[heater]->FaultOccurred()) ? HS_fault
@@ -775,10 +784,22 @@ float Heat::GetTemperature(size_t heater, TemperatureError& err)
 		numConfiguredSensors += 1;
 	}
 
+	float tolerance = (IsChamberHeater(heater) and !IsHeaterSlave(heater)) ? 30.0 : 10.0;
+
 	float t = 0.0;
 	for (size_t n = 0; n < numConfiguredSensors; n++)
 	{
-		t += temperatures[n];
+		float temperature = temperatures[n];
+
+		// Check sensor difference
+		for (size_t m = 0; m < numConfiguredSensors; m++)
+		{
+			if (fabsf(temperatures[m] - temperature) > tolerance) {
+				err = TemperatureError::sensorDifference;
+				return BadErrorTemperature;
+			}
+		}
+		t += temperature;
 	}
 	t = t / (float)numConfiguredSensors;
 
@@ -901,12 +922,9 @@ float Heat::GetLastActiveTemperature(int8_t heater)
 void Heat::SetHeaterSlave(size_t heater, int8_t slaveHeater)
 {
 	heaterSlaves[heater] = slaveHeater;
-
-
-	platform.MessageF(BlockingUsbMessage, "teeest %d %d\n", heater, slaveHeater);
 }
 
-bool Heat::IsHeaterSlave(int8_t heater)
+bool Heat::IsHeaterSlave(int8_t heater) const
 {
 	for (int masterHeater = 0; masterHeater < (int)NumHeaters; ++masterHeater)
 	{

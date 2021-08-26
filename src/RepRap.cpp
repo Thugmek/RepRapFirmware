@@ -1483,6 +1483,15 @@ OutputBuffer *RepRap::GetStatusResponse(uint8_t type, ResponseSource source)
 				response->catf("%c%.1f", ch, (double)heat->GetSensorTemperature(chamberHeater, sensor));
 				ch = ',';
 			}
+			response->cat((ch == '[') ? "[]" : "]");
+
+			response->cat(",\"slaveSensors\":");
+			ch = '[';
+			for (size_t sensor = 0; sensor < NumHeaterSensors; sensor++)
+			{
+				response->catf("%c%.1f", ch, (double)heat->GetSensorTemperature(heat->GetHeaterSlave(chamberHeater), sensor));
+				ch = ',';
+			}
 			response->cat((ch == '[') ? "[]}," : "]},");
 		}
 

@@ -29,7 +29,8 @@ enum class TemperatureError : uint8_t
 	unknownHeater,
 	overOrUnderVoltage,
 	badVref,
-	badVssa
+	badVssa,
+	sensorDifference
 };
 
 const char* TemperatureErrorString(TemperatureError err);

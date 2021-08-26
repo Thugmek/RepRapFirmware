@@ -1788,7 +1788,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 
 				for (size_t i = 0; i < heaterCount; i++)
 				{
-					if (!reprap.GetHeat().HeaterAtSetTemperature(heaters[i], true, tolerance))
+					if (!reprap.GetHeat().HeaterAtSetTemperature(heaters[i], true, tolerance, tolerance))
 					{
 						CheckReportDue(gb, reply);			// check whether we need to send a temperature or status report
 						isWaiting = true;
@@ -1811,7 +1811,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 					for (size_t i = 0; i < NumChamberHeaters; i++)
 					{
 						const int8_t heater = reprap.GetHeat().GetChamberHeater(i);
-						if (heater >= 0 && !reprap.GetHeat().HeaterAtSetTemperature(heater, true, tolerance))
+						if (heater >= 0 && !reprap.GetHeat().HeaterAtSetTemperature(heater, true, tolerance, tolerance))
 						{
 							CheckReportDue(gb, reply);		// check whether we need to send a temperature or status report
 							isWaiting = true;
@@ -1827,7 +1827,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 						if (chamberIndices[i] >= 0 && chamberIndices[i] < NumChamberHeaters)
 						{
 							const int8_t heater = reprap.GetHeat().GetChamberHeater(chamberIndices[i]);
-							if (heater >= 0 && !reprap.GetHeat().HeaterAtSetTemperature(heater, true, tolerance))
+							if (heater >= 0 && !reprap.GetHeat().HeaterAtSetTemperature(heater, true, tolerance, tolerance))
 							{
 								CheckReportDue(gb, reply);	// check whether we need to send a temperature or status report
 								isWaiting = true;
@@ -2179,7 +2179,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 
 				reprap.GetHeat().SetActiveTemperature(heater, temperature);
 				reprap.GetHeat().Activate(heater);
-				if (cancelWait || reprap.GetHeat().HeaterAtSetTemperature(heater, waitWhenCooling, TEMPERATURE_CLOSE_ENOUGH))
+				if (cancelWait || reprap.GetHeat().HeaterAtSetTemperature(heater, waitWhenCooling, TEMPERATURE_CLOSE_ENOUGH, TEMPERATURE_COOLING_CLOSE_ENOUGH))
 				{
 					cancelWait = isWaiting = false;
 					break;

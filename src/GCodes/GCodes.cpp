@@ -5343,7 +5343,7 @@ bool GCodes::ToolHeatersAtSetTemperatures(const Tool *tool, bool waitWhenCooling
 	{
 		for (size_t i = 0; i < tool->HeaterCount(); ++i)
 		{
-			if (!reprap.GetHeat().HeaterAtSetTemperature(tool->Heater(i), waitWhenCooling, tolerance))
+			if (!reprap.GetHeat().HeaterAtSetTemperature(tool->Heater(i), waitWhenCooling, tolerance, tolerance))
 			{
 				return false;
 			}
@@ -6070,10 +6070,17 @@ const char* GCodes::GetMachineModeString() const
 // The Heat module will generate an appropriate error message, so no need to do that here.
 void GCodes::HandleHeaterFault(int heater)
 {
-	if (heaterFaultState == HeaterFaultState::noFault && fileGCode->OriginalMachineState().fileState.IsLive())
-	{
-		heaterFaultState = HeaterFaultState::pausePending;
-		heaterFaultTime = millis();
+	if (heaterFaultState == HeaterFaultState::noFault) {
+		if (fileGCode->OriginalMachineState().fileState.IsLive())
+		{
+			heaterFaultState = HeaterFaultState::pausePending;
+			heaterFaultTime = millis();
+		}
+		else
+		{
+			heaterFaultState = HeaterFaultState::stopping;
+			heaterFaultTime = millis();
+		}
 	}
 }
 

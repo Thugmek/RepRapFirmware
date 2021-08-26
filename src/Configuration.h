@@ -77,6 +77,7 @@ constexpr uint32_t HeatSampleIntervalMillis = 250;		// interval between taking t
 constexpr float HeatPwmAverageTime = 5.0;				// Seconds
 
 constexpr float TEMPERATURE_CLOSE_ENOUGH = 1.0;			// Celsius
+constexpr float TEMPERATURE_COOLING_CLOSE_ENOUGH = 10.0; // Celsius
 constexpr float TEMPERATURE_LOW_SO_DONT_CARE = 40.0;	// Celsius
 constexpr float HOT_ENOUGH_TO_EXTRUDE = 160.0;			// Celsius
 constexpr float HOT_ENOUGH_TO_RETRACT = 90.0;			// Celsius
