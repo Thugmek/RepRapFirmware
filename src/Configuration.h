@@ -82,6 +82,9 @@ constexpr float TEMPERATURE_LOW_SO_DONT_CARE = 40.0;	// Celsius
 constexpr float HOT_ENOUGH_TO_EXTRUDE = 160.0;			// Celsius
 constexpr float HOT_ENOUGH_TO_RETRACT = 90.0;			// Celsius
 constexpr float TEMPERATURE_COLD = 50.0;				// Celsius
+constexpr float TEMPERATURE_DIFFERENCE_TOLERANCE = 20.0;// Celsius
+constexpr float TEMPERATURE_DIFFERENCE_TOLERANCE_CHAMBER = 30.0; // Celsius
+
 
 constexpr unsigned int MaxBadTemperatureCount = 2000/HeatSampleIntervalMillis;	// Number of bad temperature samples permitted before a heater fault is reported (2 seconds)
 constexpr float BadLowTemperature = -10.0;				// Celsius

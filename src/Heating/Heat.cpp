@@ -784,7 +784,7 @@ float Heat::GetTemperature(size_t heater, TemperatureError& err)
 		numConfiguredSensors += 1;
 	}
 
-	float tolerance = (IsChamberHeater(heater) and !IsHeaterSlave(heater)) ? 30.0 : 10.0;
+	float tolerance = (IsChamberHeater(heater) and !IsHeaterSlave(heater)) ? TEMPERATURE_DIFFERENCE_TOLERANCE_CHAMBER : TEMPERATURE_DIFFERENCE_TOLERANCE;
 
 	float t = 0.0;
 	for (size_t n = 0; n < numConfiguredSensors; n++)
