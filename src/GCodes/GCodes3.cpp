@@ -80,7 +80,10 @@ GCodeResult GCodes::SetPrintZProbe(GCodeBuffer& gb, const StringRef& reply)
 		}
 		else
 		{
-			reprap.SetAccessoryInitialized(false);
+			if (fabs(params.triggerHeight - params.currentTriggerHeight) > changeZProbeOffsetToleranceWithoutInit)
+			{
+				reprap.SetAccessoryInitialized(false);
+			}
 		}
 	}
 
@@ -610,6 +613,8 @@ GCodeResult GCodes::SetOrReportZProbe(GCodeBuffer& gb, const StringRef &reply)
 	{
 		float reqDiveHeight = gb.GetFValue();
 
+		// platform.MessageF(BlockingUsbMessage, "%.2f\n", (double)reqDiveHeight);
+
 		if (reqDiveHeight == 0) {
 			Head* h = reprap.GetCurrentHead();
 			if (h != nullptr)
@@ -619,6 +624,8 @@ GCodeResult GCodes::SetOrReportZProbe(GCodeBuffer& gb, const StringRef &reply)
 			if (p != nullptr)
 				reqDiveHeight += p->GetDiveHeight();
 		}
+
+		// platform.MessageF(BlockingUsbMessage, "%.2f\n", (double)reqDiveHeight);
 
 		if (gb.Seen('L')) // Only if current Dive height is lower then requested
 		{
@@ -632,6 +639,8 @@ GCodeResult GCodes::SetOrReportZProbe(GCodeBuffer& gb, const StringRef &reply)
 			params.diveHeight = reqDiveHeight;
 		}
 		seen = true;
+
+		// platform.MessageF(BlockingUsbMessage, "%.2f\n", (double)params.diveHeight);
 
 		// Dive height restored to low distance, while initialize accessories macro running -> initialize accessories done
 		if (gb.MachineState().runningInitializeAccessories && params.diveHeight <= 3.0)

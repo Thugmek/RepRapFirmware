@@ -4575,7 +4575,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 							if (bt_baudrates[i] == baudrate)
 								baudrate_nr = i + 1;
 					}
-					char cmd[50];
+					char cmd[60];
 					sprintf(cmd, "AT+BAUD%u\r\n", baudrate_nr);
 					platform.SendAuxMessage(cmd, true); // set device name
 
@@ -4583,19 +4583,36 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 					auxInput->ReadLine(rsp, sizeof(rsp) - 1);
 					if (strcmp(rsp, "OK") == 0)
 					{
-						char cmd[50];
-						sprintf(cmd, "AT+NAME%s\r\n", name.c_str());
-						platform.SendAuxMessage(cmd, true); // set device name
+						bool res = false;
 
-						auxInput->ReadLine(rsp, sizeof(rsp) - 1);
-						auxInput->ReadLine(rsp, sizeof(rsp) - 1);
-						if (strcmp(rsp, "OK") == 0)
+						for (int i = 0; i < 3; i++) {
+							auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+
+							char cmd[50];
+							sprintf(cmd, "AT+NAME%s\r\n", name.c_str());
+							platform.SendAuxMessage(cmd, true); // set device name
+
+							auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+							auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+							if (strcmp(rsp, "") == 0) // 30.9.2021 Fix NEW BT module error
+							{
+								auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+							}
+							if (strcmp(rsp, "OK") == 0)
+							{
+								res = true;
+								break;
+							}
+						}
+
+						if (res)
 						{
 							platform.SendAuxMessage("AT+RESET\r\n", true);
 
 							auxInput->ReadLine(rsp, sizeof(rsp) - 1);
 							auxInput->ReadLine(rsp, sizeof(rsp) - 1);
-							/*if (strcmp(rsp, "OK") == 0)
+							/*
+							if (strcmp(rsp, "OK") == 0)
 							{
 								reply.copy("Setup BT module done");
 								result = GCodeResult::ok;
@@ -4644,8 +4661,11 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				platform.SendAuxMessage("AT+LADDR\r\n", true);
 				auxInput->ReadLine(rsp, sizeof(rsp) - 1);
 
+				char * pch;
+				pch=strchr(rsp, '=');
+
 				strcpy(rsp2, "BT module MAC: ");
-				strcat(rsp2, rsp+7); // from response +LADDR=00:15:87:20:FF:46 copy only MAC
+				strcat(rsp2, rsp+(pch-rsp+1)); // from response +LADDR=00:15:87:20:FF:46 copy only MAC
 
 				gb.PrintCommand(reply);
 				reply.cat(": ");
@@ -5042,6 +5062,15 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 
 	case 1800: // Accessory status
 		result = AccessoryStatus(gb, reply);
+		break;
+
+	case 1802: // Set global accessories parameters
+		{
+			// tolerance to change z-probe offset without accessory initialization
+			if (gb.Seen('T')) {
+				changeZProbeOffsetToleranceWithoutInit = gb.GetFValue();
+			}
+		}
 		break;
 
 	case 1810: // Define head

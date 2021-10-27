@@ -1012,6 +1012,8 @@ void RepRap::DeletePad(Pad* pad)
 	}
 
 	int padNumber = pad->GetNumber();
+	String<PadConfigFileNameLength> configFileName;
+	configFileName.copy(pad->GetConfigFileName());
 
 	// Purge any references to this pad
 	MutexLocker lock(padListMutex);
@@ -1026,6 +1028,16 @@ void RepRap::DeletePad(Pad* pad)
 
 	// Delete it
 	Pad::Delete(pad);
+
+	MutexLocker lock(padListMutex);
+	for (const Pad *p = padList; p != nullptr; p = p->Next())
+	{
+		String<FormatStringLength> buf;
+
+		p->Print(buf.GetRef());
+
+		reply.catf("%s\n", buf.c_str());
+	}
 
     // Delete accessory files
 	String<MaxFilenameLength> filename;

@@ -618,6 +618,8 @@ private:
 
 	uint8_t bedProbingMode;
 
+	float changeZProbeOffsetToleranceWithoutInit; // tolerance to change z-probe offset without accessory initialization
+
 	float simulationTime;						// Accumulated simulation time
 	uint8_t simulationMode;						// 0 = not simulating, 1 = simulating, >1 are simulation modes for debugging
 	bool exitSimulationWhenFileComplete;		// true if simulating a file

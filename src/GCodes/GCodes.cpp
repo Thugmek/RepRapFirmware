@@ -178,6 +178,8 @@ void GCodes::Init()
 	isRetracted = false;
 	lastAuxStatusReportType = -1;						// no status reports requested yet
 
+	changeZProbeOffsetToleranceWithoutInit = 0.25;
+
 	tuningMode = 0;
 	tuningGcodeVal = 0.0;
 	tuningStartVal = 0.0;
