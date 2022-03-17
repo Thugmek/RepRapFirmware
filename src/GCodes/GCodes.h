@@ -615,6 +615,7 @@ private:
 	bool probeIsDeployed;						// true if M401 has been used to deploy the probe and M402 has not yet been used t0 retract it
 	bool hadProbingError;						// true if there was an error probing the last point
 	bool zDatumSetByProbing;					// true if the Z position was last set by probing, not by an endstop switch or by G92
+	float fixProbePoint;
 	uint8_t tapsDone;							// how many times we tapped the current point
 
 	uint8_t bedProbingMode;

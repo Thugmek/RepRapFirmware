@@ -186,6 +186,8 @@ void GCodes::Init()
 	tuningEndVal = 0.0;
 	tuningCurVal = 0.0;
 
+	fixProbePoint = 0.0;
+
 	laserMaxPower = DefaultMaxLaserPower;
 	laserPowerSticky = false;
 
@@ -443,6 +445,7 @@ void GCodes::CopyConfigFinalValues(GCodeBuffer& gb)
 // Set up to do the first of a possibly multi-tap probe
 void GCodes::InitialiseTaps()
 {
+	fixProbePoint = 0.0;
 	tapsDone = 0;
 	g30zHeightErrorSum = 0.0;
 	g30zHeightErrorLowestDiff = 1000.0;
@@ -1047,15 +1050,18 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 					if (not probePointBlocked)
 					{
 						SetMoveBufferDefaults();
-						moveBuffer.coords[X_AXIS] = x - platform.GetCurrentZProbeParameters().xOffset;
-						moveBuffer.coords[Y_AXIS] = y - platform.GetCurrentZProbeParameters().yOffset;
+
+						moveBuffer.coords[X_AXIS] = x - platform.GetCurrentZProbeParameters().xOffset + fixProbePoint;
+						moveBuffer.coords[Y_AXIS] = y - platform.GetCurrentZProbeParameters().yOffset + fixProbePoint;
 						moveBuffer.coords[Z_AXIS] = platform.GetZProbeStartingHeight();
 						moveBuffer.feedRate = platform.GetZProbeTravelSpeed();
 						NewMoveAvailable(1);
 
-						tapsDone = 0;
-						g30zHeightErrorSum = 0.0;
-						g30zHeightErrorLowestDiff = 1000.0;
+						if (fixProbePoint == 0.0) {
+							tapsDone = 0;
+							g30zHeightErrorSum = 0.0;
+							g30zHeightErrorLowestDiff = 1000.0;
+						}
 
 						gb.AdvanceState();
 					}
@@ -1224,7 +1230,19 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 				// Tap again
 				lastProbedTime = millis();
 				g30PrevHeightError = g30zHeightError;
-				gb.SetState(GCodeState::gridProbing2a);
+
+				if (tapsDone == 2) {
+					fixProbePoint = 3.0;
+					gb.SetState(GCodeState::gridProbing1);
+
+				} else if (tapsDone == 4) {
+					fixProbePoint = -3.0;
+					gb.SetState(GCodeState::gridProbing1);
+
+				} else {
+					fixProbePoint = 0.0;
+					gb.SetState(GCodeState::gridProbing2a);
+				}
 			}
 			else
 			{
@@ -1279,6 +1297,7 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 			else
 			{
 				++gridPointIndex;
+				fixProbePoint = 0.0;
 				gb.SetState(GCodeState::gridProbing1);
 			}
 		}
@@ -1322,6 +1341,8 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 	case GCodeState::probingAtPoint0:
 		// Initial state when executing G30 with a P parameter. Start by moving to the dive height at the current position.
 		SetMoveBufferDefaults();
+		fixProbePoint = 0.0;
+		InitialiseTaps();
 		moveBuffer.coords[Z_AXIS] = platform.GetZProbeStartingHeight();
 		moveBuffer.feedRate = platform.GetZProbeTravelSpeed();
 		NewMoveAvailable(1);
@@ -1335,11 +1356,13 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 			// Head is at the dive height but needs to be moved to the correct XY position. The XY coordinates have already been stored.
 			SetMoveBufferDefaults();
 			(void)reprap.GetMove().GetProbeCoordinates(g30ProbePointIndex, moveBuffer.coords[X_AXIS], moveBuffer.coords[Y_AXIS], true);
+			moveBuffer.coords[X_AXIS] = moveBuffer.coords[X_AXIS] + fixProbePoint;
+			moveBuffer.coords[Y_AXIS] = moveBuffer.coords[Y_AXIS] + fixProbePoint;
 			moveBuffer.coords[Z_AXIS] = platform.GetZProbeStartingHeight();
+
 			moveBuffer.feedRate = platform.GetZProbeTravelSpeed();
 			NewMoveAvailable(1);
 
-			InitialiseTaps();
 			gb.AdvanceState();
 		}
 		break;
@@ -1523,7 +1546,19 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 					// Tap again
 					g30PrevHeightError = g30zHeightError;
 					lastProbedTime = millis();
-					gb.SetState(GCodeState::probingAtPoint2a);
+
+					if (tapsDone == 2) {
+						fixProbePoint = 3.0;
+						gb.SetState(GCodeState::probingAtPoint1);
+
+					} else if (tapsDone == 4) {
+						fixProbePoint = -3.0;
+						gb.SetState(GCodeState::probingAtPoint1);
+
+					} else {
+						fixProbePoint = 0.0;
+						gb.SetState(GCodeState::probingAtPoint2a);
+					}
 					break;
 				}
 
@@ -1547,6 +1582,7 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 				reprap.GetMove().SetZeroHeightError(moveBuffer.coords);
 				ToolOffsetInverseTransform(moveBuffer.coords, currentUserPosition);
 			}
+			fixProbePoint = 0.0;
 			gb.AdvanceState();
 			if (platform.GetZProbeType() != ZProbeType::none && !probeIsDeployed)
 			{
@@ -3863,6 +3899,7 @@ GCodeResult GCodes::ProbeGrid(GCodeBuffer& gb, const StringRef& reply)
 	reprap.GetMove().AccessHeightMap().SetGrid(defaultGrid);
 	ClearBedMapping();
 	gridXindex = gridYindex = gridPointIndex = 0;
+	fixProbePoint = 0.0;
 	gb.SetState(GCodeState::gridProbing1);
 
 	if (platform.GetZProbeType() != ZProbeType::none && platform.GetZProbeType() != ZProbeType::blTouch && !probeIsDeployed)
