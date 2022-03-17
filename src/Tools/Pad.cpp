@@ -120,6 +120,24 @@ void Pad::RestoreDefaultParameters()
 {
 	diameter = 0;
 	diveHeight = 0;
+
+	for (size_t i = 0; i < sizeof(blockedProbePoints)/sizeof(blockedProbePoints[0]); i++)
+	{
+		blockedProbePoints[i] = 999;
+	}
+}
+
+bool Pad::ProbePointBlocked(uint32_t index)
+{
+	for (size_t i = 0; i < sizeof(blockedProbePoints)/sizeof(blockedProbePoints[0]); i++)
+	{
+		if (blockedProbePoints[i] == index)
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 // End

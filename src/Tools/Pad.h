@@ -20,6 +20,8 @@ Licence: GPL
 
 constexpr size_t PadNameLength = 32;						// maximum allowed length for head names
 constexpr size_t PadConfigFileNameLength = 32;				// maximum allowed length for head config filename
+constexpr size_t MaxBlockedProbePoints = 20;
+
 
 class Pad
 {
@@ -39,6 +41,10 @@ public:
 	int GetDiameter();
 	void SetDiveHeight(const float d);
 	float GetDiveHeight();
+	void SetBlockedProbePoints(uint32_t blockedProbePoints[]);
+	uint32_t *GetBlockedProbePoints();
+
+	bool ProbePointBlocked(uint32_t index);
 
 	friend class RepRap;
 
@@ -59,6 +65,7 @@ private:
 	const char *configFileName;
 	int diameter;
 	float diveHeight;
+	uint32_t blockedProbePoints[MaxBlockedProbePoints];
 };
 
 inline int Pad::GetNumber() const
@@ -94,6 +101,16 @@ inline void Pad::SetDiveHeight(const float d)
 inline float Pad::GetDiveHeight()
 {
 	return diveHeight;
+}
+
+inline void Pad::SetBlockedProbePoints(uint32_t blockedProbePoints[])
+{
+
+}
+
+inline uint32_t *Pad::GetBlockedProbePoints()
+{
+	return blockedProbePoints;
 }
 
 #endif /* PAD_H_ */

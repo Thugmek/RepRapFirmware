@@ -1029,16 +1029,6 @@ void RepRap::DeletePad(Pad* pad)
 	// Delete it
 	Pad::Delete(pad);
 
-	MutexLocker lock(padListMutex);
-	for (const Pad *p = padList; p != nullptr; p = p->Next())
-	{
-		String<FormatStringLength> buf;
-
-		p->Print(buf.GetRef());
-
-		reply.catf("%s\n", buf.c_str());
-	}
-
     // Delete accessory files
 	String<MaxFilenameLength> filename;
 	for (int i = -1; i < 100; i++)

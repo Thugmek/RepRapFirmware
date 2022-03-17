@@ -1591,7 +1591,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			else
 			{
 				if (reprap.GetCurrentTool() != nullptr)
-					if (reprap.GetPrintMonitor().IsPrinting())
+					if (reprap.GetPrintMonitor().IsPrinting() or gb.IsDoingFileMacro())
 						temperature = reprap.GetHeat().GetLastActiveTemperature(reprap.GetCurrentTool()->Heater(0)); // Restore last temperature
 					else
 						temperature = 0.0;
@@ -2020,7 +2020,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 			}
 			else if (currentHeater >= 0)
 			{
-				if (reprap.GetPrintMonitor().IsPrinting())
+				if (reprap.GetPrintMonitor().IsPrinting() or gb.IsDoingFileMacro())
 					temperature = heat.GetLastActiveTemperature(currentHeater); // Restore last temperature
 				else
 					temperature = 0.0;
@@ -2162,7 +2162,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				{
 					waitWhenCooling = false;
 
-					if (reprap.GetPrintMonitor().IsPrinting())
+					if (reprap.GetPrintMonitor().IsPrinting() or gb.IsDoingFileMacro())
 						temperature = reprap.GetHeat().GetLastActiveTemperature(heater); // Restore last temperature
 					else
 						temperature = 0.0;
@@ -5114,6 +5114,11 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 
 				if (gb.Seen('H')) {
 					p->SetDiveHeight(gb.GetFValue());
+				}
+
+				if (gb.Seen('B')) {
+					size_t numValues = MaxBlockedProbePoints;
+					gb.GetUnsignedArray(p->GetBlockedProbePoints(), numValues, false);
 				}
 			} else {
 				reply.printf("No pad selected");

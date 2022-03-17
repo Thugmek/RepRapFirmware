@@ -361,6 +361,7 @@ private:
 	bool WriteWorkplaceCoordinates(FileStore *f) const;
 #endif
 	bool WriteScaleCartesianFactor(FileStore *f) const;
+	bool WriteAxisSkewCompensation(FileStore *f) const;
 
 	GCodeResult SetHeaterProtection(GCodeBuffer &gb, const StringRef &reply);	// Configure heater protection (M143)
 	void SetPidParameters(GCodeBuffer& gb, int heater, const StringRef& reply); // Set the P/I/D parameters for a heater
@@ -609,7 +610,7 @@ private:
 	float g30zHeightErrorLowestDiff;			// the lowest difference we have seen between consecutive readings
 	uint32_t lastProbedTime;					// time in milliseconds that the probe was last triggered
 	volatile bool zProbeTriggered;				// Set by the step ISR when a move is aborted because the Z probe is triggered
-	size_t gridXindex, gridYindex;				// Which grid probe point is next
+	size_t gridXindex, gridYindex, gridPointIndex;				// Which grid probe point is next
 	bool doingManualBedProbe;					// true if we are waiting for the user to jog the nozzle until it touches the bed
 	bool probeIsDeployed;						// true if M401 has been used to deploy the probe and M402 has not yet been used t0 retract it
 	bool hadProbingError;						// true if there was an error probing the last point

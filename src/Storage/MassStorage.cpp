@@ -606,7 +606,7 @@ GCodeResult MassStorage::Mount(size_t card, const StringRef& reply, bool reportS
 	}
 
 	inf.isMounted = true;
-	if (reportSuccess and false) // MS 2021-02-01 potlaceni hlasek pri updatu configu
+	if (reportSuccess) // MS 2021-02-01 potlaceni hlasek pri updatu configu
 	{
 		float capacity = ((float)sd_mmc_get_capacity(card) * 1024) / 1000000;		// get capacity and convert from Kib to Mbytes
 		const char* capUnits;
@@ -635,11 +635,11 @@ GCodeResult MassStorage::Unmount(size_t card, const StringRef& reply)
 		return GCodeResult::error;
 	}
 
-	// reply.printf("SD card %u may now be removed", card); // MS 2021-02-01 potlaceni hlasek pri updatu configu
+	reply.printf("SD card %u may now be removed", card); // MS 2021-02-01 potlaceni hlasek pri updatu configu
 	const unsigned int numFilesClosed = InternalUnmount(card, true);
 	if (numFilesClosed != 0)
 	{
-	//	reply.catf(" (%u file(s) were closed)", numFilesClosed);
+		reply.catf(" (%u file(s) were closed)", numFilesClosed);
 	}
 	return GCodeResult::ok;
 }

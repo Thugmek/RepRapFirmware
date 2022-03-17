@@ -359,6 +359,22 @@ bool GCodes::WriteScaleCartesianFactor(FileStore *f) const
 	return f->Write(scratchString.c_str());
 }
 
+bool GCodes::WriteAxisSkewCompensation(FileStore *f) const
+{
+	String<ScratchStringLength> scratchString;
+
+	scratchString.copy("; Axis skew compensation\n");
+
+	scratchString.cat("M556");
+	for(size_t axis = 0; axis < numVisibleAxes; axis++)
+	{
+		scratchString.catf(" %c%.5f", axisLetters[axis], (double)reprap.GetMove().AxisCompensation(axis));
+	}
+	scratchString.cat('\n');
+
+	return f->Write(scratchString.c_str());
+}
+
 // Define the probing grid, called when we see an M557 command
 GCodeResult GCodes::DefineGrid(GCodeBuffer& gb, const StringRef &reply)
 {

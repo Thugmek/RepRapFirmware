@@ -1033,22 +1033,36 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 			const GridDefinition& grid = move.AccessHeightMap().GetGrid();
 			const float x = grid.GetXCoordinate(gridXindex);
 			const float y = grid.GetYCoordinate(gridYindex);
+
+			bool probePointBlocked = false;
+			Pad* p = reprap.GetCurrentPad();
+			if (p != nullptr) {
+				probePointBlocked = p->ProbePointBlocked(gridPointIndex);
+			}
+
 			if (grid.IsInRadius(x, y))
 			{
 				if (move.IsAccessibleProbePoint(x, y))
 				{
-					SetMoveBufferDefaults();
-					moveBuffer.coords[X_AXIS] = x - platform.GetCurrentZProbeParameters().xOffset;
-					moveBuffer.coords[Y_AXIS] = y - platform.GetCurrentZProbeParameters().yOffset;
-					moveBuffer.coords[Z_AXIS] = platform.GetZProbeStartingHeight();
-					moveBuffer.feedRate = platform.GetZProbeTravelSpeed();
-					NewMoveAvailable(1);
+					if (not probePointBlocked)
+					{
+						SetMoveBufferDefaults();
+						moveBuffer.coords[X_AXIS] = x - platform.GetCurrentZProbeParameters().xOffset;
+						moveBuffer.coords[Y_AXIS] = y - platform.GetCurrentZProbeParameters().yOffset;
+						moveBuffer.coords[Z_AXIS] = platform.GetZProbeStartingHeight();
+						moveBuffer.feedRate = platform.GetZProbeTravelSpeed();
+						NewMoveAvailable(1);
 
-					tapsDone = 0;
-					g30zHeightErrorSum = 0.0;
-					g30zHeightErrorLowestDiff = 1000.0;
+						tapsDone = 0;
+						g30zHeightErrorSum = 0.0;
+						g30zHeightErrorLowestDiff = 1000.0;
 
-					gb.AdvanceState();
+						gb.AdvanceState();
+					}
+					else
+					{
+						gb.SetState(GCodeState::gridProbing6);
+					}
 				}
 				else
 				{
@@ -1264,6 +1278,7 @@ void GCodes::RunStateMachine(GCodeBuffer& gb, const StringRef& reply)
 			}
 			else
 			{
+				++gridPointIndex;
 				gb.SetState(GCodeState::gridProbing1);
 			}
 		}
@@ -3847,7 +3862,7 @@ GCodeResult GCodes::ProbeGrid(GCodeBuffer& gb, const StringRef& reply)
 
 	reprap.GetMove().AccessHeightMap().SetGrid(defaultGrid);
 	ClearBedMapping();
-	gridXindex = gridYindex = 0;
+	gridXindex = gridYindex = gridPointIndex = 0;
 	gb.SetState(GCodeState::gridProbing1);
 
 	if (platform.GetZProbeType() != ZProbeType::none && platform.GetZProbeType() != ZProbeType::blTouch && !probeIsDeployed)
@@ -5690,6 +5705,11 @@ GCodeResult GCodes::WriteConfigOverrideFile(GCodeBuffer& gb, const StringRef& re
 	if (ok)
 	{
 		ok = WriteScaleCartesianFactor(f);
+	}
+
+	if (ok)
+	{
+		ok = WriteAxisSkewCompensation(f);
 	}
 
 	if (ok)
