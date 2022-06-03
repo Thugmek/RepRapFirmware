@@ -3173,6 +3173,8 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				m501SeenInConfigFile = true;
 			}
 			DoFileMacro(gb, CONFIG_OVERRIDE_G, true, code);
+
+			DoFileMacro(gb, CONFIG_OVERRIDE_ADDITIONAL_G, false, code);
 		}
 		break;
 

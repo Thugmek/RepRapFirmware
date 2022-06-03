@@ -706,6 +706,7 @@ private:
 	static constexpr const char* SLEEP_PALETTE2_G = "sleep-palette2.g";
 	static constexpr const char* END_PALETTE2_G = "end-palette2.g";
 	static constexpr const char* CONFIG_OVERRIDE_G = "config-override.g";
+	static constexpr const char* CONFIG_OVERRIDE_ADDITIONAL_G = "config-override-additional.g";
 	static constexpr const char* DEPLOYPROBE_G = "deployprobe.g";
 	static constexpr const char* RETRACTPROBE_G = "retractprobe.g";
 	static constexpr const char* DefaultHeightMapFile = "heightmap.csv";
