@@ -365,7 +365,7 @@ bool GCodes::WriteAxisSkewCompensation(FileStore *f) const
 
 	scratchString.copy("; Axis skew compensation\n");
 
-	scratchString.cat("M556");
+	scratchString.cat("M556 S1");
 	for(size_t axis = 0; axis < numVisibleAxes; axis++)
 	{
 		scratchString.catf(" %c%.5f", axisLetters[axis], (double)reprap.GetMove().AxisCompensation(axis));

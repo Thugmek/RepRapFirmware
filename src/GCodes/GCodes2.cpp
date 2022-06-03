@@ -3505,6 +3505,15 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 						reprap.GetMove().SetAxisCompensation(axis, gb.GetFValue() / value);
 					}
 				}
+
+			} else if (value == 1.0) {
+				for (size_t axis = 0; axis <= Z_AXIS; axis++)
+				{
+					if (gb.Seen(axisLetters[axis]))
+					{
+						reprap.GetMove().SetAxisCompensation(axis, gb.GetFValue());
+					}
+				}
 			}
 		}
 		else
