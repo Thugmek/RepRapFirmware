@@ -132,8 +132,8 @@ constexpr Pin SpiTempSensorCsPins[MaxSpiTempSensors] = { 56, 27 };
 
 constexpr size_t MaxSpiTempSensors = 8;
 
-// Digital pins the 31855s have their select lines tied to
-constexpr Pin SpiTempSensorCsPins[MaxSpiTempSensors] = { 28, 50, 51, 52, 24, 97, 98, 99 };	// SPI0_CS1, SPI0_CS2, CS3, CS4, CS5, CS6, CS7, CS8
+// Digital pins the 31855s have their select lines tied to 28, 50, 51, 52
+constexpr Pin SpiTempSensorCsPins[MaxSpiTempSensors] = { NoPin, NoPin, NoPin, NoPin, 24, 97, 98, 99 };	// SPI0_CS1, SPI0_CS2, CS3, CS4, CS5, CS6, CS7, CS8
 
 #endif
 

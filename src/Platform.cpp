@@ -41,6 +41,7 @@
 #include "Hardware/Cache.h"
 #include "Math/Isqrt.h"
 #include "Hardware/I2C.h"
+#include "Hardware/HX711-multi.h"
 
 #ifndef __LPC17xx__
 # include "sam/drivers/tc/tc.h"
@@ -764,6 +765,10 @@ int Platform::GetZProbeReading() const
 #else
 			zProbeVal = 1000;
 #endif
+			break;
+
+		case ZProbeType::weightSensor:
+			// zProbeVal =
 			break;
 
 		default:

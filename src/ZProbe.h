@@ -23,7 +23,8 @@ enum class ZProbeType : uint8_t
 	unfilteredDigital = 8,
 	blTouch = 9,
 	zMotorStall = 10,
-	numTypes = 11					// must be 1 higher than the last type
+	weightSensor = 11,
+	numTypes = 12					// must be 1 higher than the last type
 };
 
 class ZProbe

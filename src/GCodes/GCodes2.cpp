@@ -4556,6 +4556,7 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				gb.GetPossiblyQuotedString(name.GetRef());
 
 				uint32_t bt_baudrates[9] = { 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400 };
+				uint32_t bt_baudrates_d1[9] = { 9600, 19200, 38400, 57600, 115200, 4800, 2400, 1200, 230400 };
 				uint32_t mem_baudrate = platform.GetBaudRate(1); // backup baudrate setting
 
 				bool detected = false;
@@ -4578,21 +4579,37 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 
 				if (detected)
 				{
+					int device_model = 0;
+					if (gb.Seen('D')) {
+						device_model = gb.GetIValue();
+					}
+
 					int baudrate_nr = 8;
-					if (gb.Seen('B'))
-					{
+					if (gb.Seen('B')) {
 						uint32_t baudrate = gb.GetIValue();
-						for(int i = 0; i < 9; i++)
-							if (bt_baudrates[i] == baudrate)
-								baudrate_nr = i + 1;
+						for(int i = 0; i < 9; i++) {
+							if (device_model == 1) {
+								if (bt_baudrates_d1[i] == baudrate) {
+									baudrate_nr = i;
+									break;
+								}
+							} else {
+								if (bt_baudrates[i] == baudrate) {
+									baudrate_nr = i + 1;
+									break;
+								}
+							}
+						}
 					}
 					char cmd[60];
 					sprintf(cmd, "AT+BAUD%u\r\n", baudrate_nr);
 					platform.SendAuxMessage(cmd, true); // set device name
 
 					auxInput->ReadLine(rsp, sizeof(rsp) - 1); // trash responsed name
-					auxInput->ReadLine(rsp, sizeof(rsp) - 1);
-					if (strcmp(rsp, "OK") == 0)
+					if (strncmp(rsp, "OK", 2) != 0) {
+						auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+					}
+					if (strncmp(rsp, "OK", 2) == 0)
 					{
 						bool res = false;
 
@@ -4604,12 +4621,14 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 							platform.SendAuxMessage(cmd, true); // set device name
 
 							auxInput->ReadLine(rsp, sizeof(rsp) - 1);
-							auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+							if (strncmp(rsp, "OK", 2) != 0) {
+								auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+							}
 							if (strcmp(rsp, "") == 0) // 30.9.2021 Fix NEW BT module error
 							{
 								auxInput->ReadLine(rsp, sizeof(rsp) - 1);
 							}
-							if (strcmp(rsp, "OK") == 0)
+							if (strncmp(rsp, "OK", 2) == 0)
 							{
 								res = true;
 								break;
@@ -4673,8 +4692,17 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 				auxInput->ReadLine(rsp, sizeof(rsp) - 1);
 
 				char * pch;
-				pch=strchr(rsp, '=');
+				if (strcmp(rsp, "") == 0) // 16.8.2022 Fix NEW BT module error
+				{
+					platform.SendAuxMessage("AT+ADDR?\r\n", true);
 
+					auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+					// OK+ADDR:1893D72A8935
+					pch=strchr(rsp, ':');
+
+				} else {
+					pch=strchr(rsp, '=');
+				}
 				strcpy(rsp2, "BT module MAC: ");
 				strcat(rsp2, rsp+(pch-rsp+1)); // from response +LADDR=00:15:87:20:FF:46 copy only MAC
 

@@ -54,6 +54,8 @@ Licence: GPL
 # include "Microstepping.h"
 #endif
 
+# include "Hardware/HX711-multi.h"
+
 constexpr bool FORWARDS = true;
 constexpr bool BACKWARDS = !FORWARDS;
 
@@ -817,6 +819,10 @@ private:
 
 	void InitZProbe();
 	uint16_t GetRawZProbeReading() const;
+
+	size_t DOUTS[3];
+
+	HX711MULTI scales;
 
 	// Axes and endstops
 	float axisMaxima[MaxAxes];
