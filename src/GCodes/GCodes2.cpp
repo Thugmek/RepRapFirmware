@@ -118,6 +118,11 @@ bool GCodes::ActOnCode(GCodeBuffer& gb, const StringRef& reply)
 		return HandleUnknownCode(gb, reply);
 	}
 
+	// if (strncmp(gb.Buffer(), "OK+", 3) == 0) { // Fix bluetooth OK+LOSTOK+CONNM36
+	//
+	//	return true;
+	// }
+
 	reply.printf("Bad command: %s", gb.Buffer());
 	HandleReply(gb, GCodeResult::error, reply.c_str());
 	return true;
@@ -4637,6 +4642,13 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 
 						if (res)
 						{
+							platform.SendAuxMessage("AT+NOTI0\r\n", true); // Fix OK+CONNM36
+
+							auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+							if (strncmp(rsp, "OK", 2) != 0) {
+								auxInput->ReadLine(rsp, sizeof(rsp) - 1);
+							}
+
 							platform.SendAuxMessage("AT+RESET\r\n", true);
 
 							auxInput->ReadLine(rsp, sizeof(rsp) - 1);
