@@ -4642,7 +4642,11 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 
 						if (res)
 						{
+							auxInput->Reset(); // reset serial input buffer
+
 							platform.SendAuxMessage("AT+NOTI0\r\n", true); // Fix OK+CONNM36
+
+
 
 							auxInput->ReadLine(rsp, sizeof(rsp) - 1);
 							if (strncmp(rsp, "OK", 2) != 0) {
