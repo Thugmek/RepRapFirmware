@@ -356,7 +356,8 @@ public:
 	void AppendAuxReply(const char *msg, bool rawMessage);
     uint32_t GetAuxSeq() { return auxSeq; }
     bool HaveAux() const { return auxDetected; }			// Any device on the AUX line?
-    void SetAuxDetected() { auxDetected = true; }
+    void SetAuxDetected();
+    void SetAuxDisconnected();
 
 	void SetIPAddress(IPAddress ip);
 	IPAddress GetIPAddress() const;

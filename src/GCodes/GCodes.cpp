@@ -303,6 +303,7 @@ void GCodes::Reset()
 	lastEndstopStates = platform.GetAllEndstopStates();
 	firmwareUpdateModuleMap = 0;
 	lastFilamentError = FilamentSensorStatus::ok;
+	noFilament = false;
 
 	codeQueue->Clear();
 	cancelWait = isWaiting = displayNoToolWarning = false;
@@ -2046,8 +2047,14 @@ void GCodes::CheckFilament()
 		lastFilamentError = FilamentSensorStatus::ok;
 		platform.Message(LogMessage, filamentErrorString.c_str());
 
-		platform.MessageF(LcdMessage, "no_filament: %s\n", filamentErrorString.c_str());
+		ReportAuxNoFilament();
 	}
+}
+
+void GCodes::ReportAuxNoFilament()
+{
+	noFilament = true;
+	platform.MessageF(LcdMessage, "no_filament: %s\n", "Extruder reports no filament");
 }
 
 // Log a filament error. Called by Platform when a filament sensor reports an incorrect status and a print is in progress.

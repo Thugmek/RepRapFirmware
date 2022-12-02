@@ -991,6 +991,8 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply)
 							reprap.ClearAlert(); // Clear please follow the instructions on Palette screen alert
 						}
 
+						noFilament = false;
+
 						gb.SetState(GCodeState::resuming1);
 						if (AllAxesAreHomed())
 						{

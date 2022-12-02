@@ -1283,6 +1283,49 @@ void Platform::SetEmulating(Compatibility c)
 	}
 }
 
+void Platform::SetAuxDetected()
+{
+	bool connect = false;
+
+	if (auxDetected == false) {
+		auxDetected = true;
+
+		MessageF(BlockingUsbMessage, "DeltaControl Connected\n");
+
+		connect = true;
+	}
+
+	if (millis() - reprap.GetLastAuxActivity() >= 5000) {
+		// MACRO_DONE
+		if (reprap.GetGCodes().DoingFileMacro() == false) {
+			Message(LcdMessage, "MACRO_DONE\n");
+		}
+
+		// usb_upload_done
+		if (reprap.GetPrintMonitor().IsPrinting() == true) {
+			Message(LcdMessage, "usb_upload_done\n");
+		}
+	}
+
+	if (connect == true) {
+		// No filament
+		if (reprap.GetGCodes().GetNoFilament() == true) {
+			reprap.GetGCodes().ReportAuxNoFilament();
+		}
+	}
+
+	reprap.SetLastAuxActivity();
+}
+
+void Platform::SetAuxDisconnected()
+{
+	if (auxDetected == true) {
+		auxDetected = false;
+
+		MessageF(BlockingUsbMessage, "DeltaControl Disconnected\n");
+	}
+}
+
 void Platform::SetIPAddress(IPAddress ip)
 {
 	ipAddress = ip;
@@ -1323,13 +1366,13 @@ bool Platform::FlushAuxMessages()
 	}
 
 	// FIX timeout flush auxGCodeReply buffer, when not connected mobile app
-	if (auxGCodeReply != nullptr)
-	{
-		if (auxGCodeReply->BytesLeft() == 0 || auxGCodeReply->GetAge() > AUX_TIMEOUT)
-		{
-			auxGCodeReply = OutputBuffer::Release(auxGCodeReply);
-		}
-	}
+	//if (auxGCodeReply != nullptr)
+	//{
+	//	if (auxGCodeReply->BytesLeft() == 0 || auxGCodeReply->GetAge() > AUX_TIMEOUT)
+	//	{
+	//		auxGCodeReply = OutputBuffer::Release(auxGCodeReply);
+	//	}
+	//}
 
 	return auxOutput.GetFirstItem() != nullptr;
 #else

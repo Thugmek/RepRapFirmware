@@ -501,6 +501,15 @@ void RepRap::Spin()
 	}
 	*/
 
+	if (now - lastAuxActivityCheck >= 30000)
+	{
+		if (platform->HaveAux()) {
+			platform->SetAuxDisconnected();
+		}
+
+		lastAuxActivityCheck = now;
+	}
+
 	/*
 	// !!! TEMPORARY FIX OUT OF BUFFERS !!!
 	if (OutputBuffer::GetFreeBuffers() <= 0)
@@ -3494,6 +3503,11 @@ bool RepRap::WriteAccessoryStatus(FileStore *f) const
 /*static*/ double RepRap::SinCos(double angle)
 {
 	return sin(angle) + cos(angle);
+}
+
+void RepRap::SetLastAuxActivity() {
+	lastAuxActivity = millis();
+	lastAuxActivityCheck = millis();
 }
 
 // Report an internal error

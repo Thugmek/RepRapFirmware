@@ -226,6 +226,8 @@ public:
 	size_t GetNumExtruders() const { return numExtruders; }
 
 	void FilamentError(size_t extruder, FilamentSensorStatus fstat);
+	void ReportAuxNoFilament();
+	bool GetNoFilament() const { return noFilament; };
 	void HandleHeaterFault(int heater);									// Respond to a heater fault
 
 #if HAS_VOLTAGE_MONITOR
@@ -662,6 +664,7 @@ private:
 	// Filament monitoring
 	FilamentSensorStatus lastFilamentError;
 	size_t lastFilamentErrorExtruder;
+	bool noFilament;
 
 	// Laser
 	float laserMaxPower;

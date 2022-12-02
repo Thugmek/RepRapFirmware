@@ -179,6 +179,9 @@ public:
 	static float SinfCosf(float angle);						// helper function for diagnostic tests
 	static double SinCos(double angle);						// helper function for diagnostic tests
 
+	uint32_t GetLastAuxActivity() { return lastAuxActivity; }
+	void SetLastAuxActivity();
+
 #ifdef RTOS
 	void KickHeatTaskWatchdog() { heatTaskIdleTicks = 0; }
 #endif
@@ -224,7 +227,9 @@ private:
 
 	//uint32_t lastSendStatus;
 	uint32_t lastCheckSafetyTimer;
-	uint32_t lastSendDiagnostics;
+	//uint32_t lastSendDiagnostics;
+	uint32_t lastAuxActivity;
+	uint32_t lastAuxActivityCheck;
 
 	uint16_t activeExtruders;
 	uint16_t activeToolHeaters;
