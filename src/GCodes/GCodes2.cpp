@@ -2847,8 +2847,9 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply) THROWS(GCodeEx
 				break;
 
 			case 408: // Get status in JSON format
+			case 1408:
 				{
-					const unsigned int type = gb.Seen('S') ? gb.GetUIValue() : 0;
+					const unsigned int type = gb.Seen('S') ? (code == 1408) ? gb.GetUIValue()+10 : gb.GetUIValue() : 0;
 #if SUPPORT_CAN_EXPANSION
 					const uint32_t board = (gb.Seen('B')) ? gb.GetUIValue() : 0;
 					if (board != 0)

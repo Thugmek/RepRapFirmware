@@ -38,6 +38,8 @@
 #include <Tools/Tool.h>
 #include <Endstops/ZProbe.h>
 #include <ObjectModel/Variable.h>
+#include <Hardware/SoftwareReset.h>
+#include <Hardware/ExceptionHandlers.h>
 
 #if SUPPORT_LED_STRIPS
 # include <Fans/LedStripDriver.h>
@@ -857,6 +859,9 @@ void GCodes::CheckTriggers() noexcept
 void GCodes::DoEmergencyStop() noexcept
 {
 	reprap.EmergencyStop();
+
+	SoftwareReset(SoftwareResetReason::user);
+
 	Reset();
 	platform.Message(GenericMessage, "Emergency Stop! Reset the controller to continue.\n");
 }
@@ -4590,6 +4595,10 @@ OutputBuffer *GCodes::GenerateJsonStatusResponse(int type, int seq, ResponseSour
 		case 2:
 		case 3:
 		case 4:
+		case 10:
+		case 11:
+		case 12:
+		case 13:
 			statusResponse = reprap.GetStatusResponse(type - 1, source);
 			break;
 

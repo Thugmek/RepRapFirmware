@@ -41,7 +41,7 @@ constexpr uint32_t IAP_IMAGE_START = 0x20018000;	// IAP is loaded into the last 
 # define HAS_SBC_INTERFACE		1
 # define HAS_MASS_STORAGE		0
 #else
-# define HAS_WIFI_NETWORKING	1
+# define HAS_WIFI_NETWORKING	0
 # define HAS_W5500_NETWORKING	1
 # define HAS_SBC_INTERFACE		0
 #endif
@@ -64,20 +64,20 @@ constexpr uint32_t IAP_IMAGE_START = 0x20018000;	// IAP is loaded into the last 
 #if defined(USE_SBC)
 # define SUPPORT_SCANNER		0
 #else
-# define SUPPORT_SCANNER		1					// set zero to disable support for FreeLSS scanners
+# define SUPPORT_SCANNER		0					// set zero to disable support for FreeLSS scanners
 #endif
-#define SUPPORT_LASER			1					// support laser cutters and engravers using G1 S parameter
-#define SUPPORT_IOBITS			1					// set to support P parameter in G0/G1 commands
-#define SUPPORT_DHT_SENSOR		1					// set nonzero to support DHT temperature/humidity sensors
+#define SUPPORT_LASER			0					// support laser cutters and engravers using G1 S parameter
+#define SUPPORT_IOBITS			0					// set to support P parameter in G0/G1 commands
+#define SUPPORT_DHT_SENSOR		0					// set nonzero to support DHT temperature/humidity sensors
 #define SUPPORT_WORKPLACE_COORDINATES	1			// set nonzero to support G10 L2 and G53..59
-#define SUPPORT_12864_LCD		1					// set nonzero to support 12864 LCD and rotary encoder
+#define SUPPORT_12864_LCD		0					// set nonzero to support 12864 LCD and rotary encoder
 #if defined(USE_SBC)
 # define SUPPORT_ACCELEROMETERS	0					// temporary until we can pass accelerometer data to the SBC
 #else
 # define SUPPORT_ACCELEROMETERS	1
 #endif
 #define SUPPORT_OBJECT_MODEL	1
-#define SUPPORT_LED_STRIPS		1
+#define SUPPORT_LED_STRIPS		0
 
 #define VARIABLE_NUM_DRIVERS	SUPPORT_12864_LCD	// nonzero means that some pins may only support drivers if not used for other purposes e.g. LCD
 
@@ -87,8 +87,8 @@ constexpr uint32_t IAP_IMAGE_START = 0x20018000;	// IAP is loaded into the last 
 # define SUPPORT_TELNET			0
 #else
 # define SUPPORT_HTTP			1
-# define SUPPORT_FTP			1
-# define SUPPORT_TELNET			1
+# define SUPPORT_FTP			0
+# define SUPPORT_TELNET			0
 #endif
 
 #define SUPPORT_ASYNC_MOVES		1
