@@ -1548,7 +1548,13 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply) THROWS(GCodeEx
 					}
 					else
 					{
-						break;		// no target temperature given
+						if (reprap.GetCurrentTool() != nullptr)
+							if (reprap.GetPrintMonitor().IsPrinting() or gb.IsDoingFileMacro())
+								temperature = reprap.GetHeat().GetLastActiveTemperature(reprap.GetCurrentTool()->GetHeater(0)); // Restore last temperature
+							else
+								temperature = 0.0;
+						else
+							break; // no target temperature given
 					}
 
 					// Find the tool that the command applies to.
@@ -2004,6 +2010,17 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply) THROWS(GCodeEx
 							}
 						}
 					}
+					else if (currentHeater >= 0)
+					{
+						float temperature = 0.0;
+						if (reprap.GetPrintMonitor().IsPrinting() or gb.IsDoingFileMacro())
+							temperature = heat.GetLastActiveTemperature(currentHeater); // Restore last temperature
+
+						heat.SetActiveTemperature(currentHeater, temperature);		// may throw
+						result = heat.SetActiveOrStandby(currentHeater, nullptr, true, reply);
+
+						seen = true;
+					}
 
 					// Standby temperature
 					if (gb.Seen('R'))
@@ -2085,7 +2102,12 @@ bool GCodes::HandleMcode(GCodeBuffer& gb, const StringRef& reply) THROWS(GCodeEx
 						}
 						else
 						{
-							break;		// no target temperature given
+							waitWhenCooling = false;
+
+							if (reprap.GetPrintMonitor().IsPrinting() or gb.IsDoingFileMacro())
+								temperature = reprap.GetHeat().GetLastActiveTemperature(heater); // Restore last temperature
+							else
+								temperature = 0.0;
 						}
 
 						reprap.GetHeat().SetActiveTemperature(heater, temperature);		// may throw

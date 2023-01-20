@@ -593,6 +593,9 @@ void Heater::SetTemperature(float t, bool activeNotStandby) THROWS(GCodeExceptio
 	}
 	else
 	{
+		if(t > 0 && activeNotStandby)
+			lastActiveTemperature = t;
+
 		((activeNotStandby) ? activeTemperature : standbyTemperature) = t;
 		if (GetMode() > HeaterMode::suspended && active == activeNotStandby)
 		{

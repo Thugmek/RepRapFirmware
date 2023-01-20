@@ -70,6 +70,7 @@ public:
 	const char *GetSensorName() const noexcept;							// Get the name of the sensor for this heater, or nullptr if it hasn't been named
 	void SetTemperature(float t, bool activeNotStandby) THROWS(GCodeException);
 	float GetActiveTemperature() const noexcept { return activeTemperature; }
+	float GetLastActiveTemperature() const noexcept { return lastActiveTemperature; }
 	float GetStandbyTemperature() const noexcept { return standbyTemperature; }
 	GCodeResult SetActiveOrStandby(bool setActive, const StringRef& reply) noexcept;	// Switch from idle to active or standby
 	GCodeResult StartAutoTune(GCodeBuffer& gb, const StringRef& reply, FansBitmap fans) THROWS(GCodeException);
@@ -200,6 +201,7 @@ private:
 	int sensorNumber;								// the sensor number used by this heater
 	float activeTemperature;						// the required active temperature
 	float standbyTemperature;						// the required standby temperature
+	float lastActiveTemperature;					// the last non-zero temperature
 	float maxTempExcursion;							// the maximum temperature excursion permitted while maintaining the setpoint
 	float maxHeatingFaultTime;						// how long a heater fault is permitted to persist before a heater fault is raised
 

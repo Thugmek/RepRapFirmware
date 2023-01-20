@@ -1270,6 +1270,12 @@ void Heat::InsertSensor(TemperatureSensor *newSensor) noexcept
 	}
 }
 
+float Heat::GetLastActiveTemperature(int8_t heater)
+{
+	const auto h = FindHeater(heater);
+	return (h.IsNull()) ? ABS_ZERO : h->GetLastActiveTemperature();
+}
+
 #if HAS_MASS_STORAGE || HAS_SBC_INTERFACE
 
 // Save some resume information returning true if successful.
