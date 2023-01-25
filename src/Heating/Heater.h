@@ -201,7 +201,7 @@ private:
 	int sensorNumber;								// the sensor number used by this heater
 	float activeTemperature;						// the required active temperature
 	float standbyTemperature;						// the required standby temperature
-	float lastActiveTemperature;					// the last non-zero temperature
+	float lastActiveTemperature = 0.0;					// the last non-zero temperature
 	float maxTempExcursion;							// the maximum temperature excursion permitted while maintaining the setpoint
 	float maxHeatingFaultTime;						// how long a heater fault is permitted to persist before a heater fault is raised
 
