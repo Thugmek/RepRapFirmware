@@ -109,6 +109,7 @@ Heater::Heater(unsigned int num) noexcept
 	  isBedOrChamber(false),
 	  active(false), modelSetByUser(false), monitorsSetByUser(false)
 {
+	lastActiveTemperature = 0.0;
 }
 
 Heater::~Heater() noexcept
