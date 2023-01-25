@@ -105,11 +105,11 @@ Heater::HeaterParameters Heater::fanOffParams, Heater::fanOnParams;
 
 Heater::Heater(unsigned int num) noexcept
 	: tuned(false), heaterNumber(num), sensorNumber(-1), activeTemperature(0.0), standbyTemperature(0.0),
+	  lastActiveTemperature(0.0),
 	  maxTempExcursion(DefaultMaxTempExcursion), maxHeatingFaultTime(DefaultMaxHeatingFaultTime),
 	  isBedOrChamber(false),
 	  active(false), modelSetByUser(false), monitorsSetByUser(false)
 {
-	lastActiveTemperature = 0.0;
 }
 
 Heater::~Heater() noexcept
